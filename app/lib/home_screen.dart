@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             color: DuetColors.text)),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.favorite_border,
+                    icon: const Icon(Icons.health_and_safety_outlined,
                         color: DuetColors.dim, size: 22),
                     tooltip: 'Alarm health',
                     onPressed: () => Navigator.of(context).push(
@@ -108,7 +108,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 14),
 
-              if (next != null) _nextCard(next.alarm, next.at),
+              if (next != null)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () => _edit(next.alarm),
+                    child: _nextCard(next.alarm, next.at),
+                  ),
+                ),
               if (next == null && alarms.isNotEmpty) ...[
                 const DuetCard(
                   child: Text('Every alarm is switched off.',
@@ -118,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
               if (alarms.isEmpty)
                 _emptyState()
-              else ...[
+              else if (alarms.length > 1) ...[
                 const SizedBox(height: 26),
                 SectionLabel('All alarms (${alarms.length})'),
                 const SizedBox(height: 10),
@@ -196,7 +204,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
 
   Widget _emptyState() => Padding(
-        padding: const EdgeInsets.only(top: 60),
+        // Roughly optical centre of the remaining space, allowing for the FAB.
+        padding: EdgeInsets.only(
+            top: MediaQuery.of(context).size.height * 0.20, bottom: 40),
         child: Column(children: [
           const PairRing(size: 64, hasPartner: false),
           const SizedBox(height: 22),
