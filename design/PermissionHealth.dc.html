@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171310; color: #F5EDE6;
+           font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    a { color: #E9A35B; } a:hover { color: #F2BC80; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden; background: #171310;">
+
+  <div style="display: flex; align-items: center; height: 56px; padding: 0 8px; flex-shrink: 0;">
+    <button style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B2A398" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+  </div>
+
+  <div style="padding: 4px 22px 22px;">
+    <h1 style="font-size: 27px; font-weight: 500; margin: 0; letter-spacing: -0.2px;">Alarm health</h1>
+    <p style="font-size: 14.5px; color: #9C8E84; margin: 8px 0 0; line-height: 1.5; text-wrap: pretty;">Your phone can pause apps to save battery. These settings keep your alarm running.</p>
+  </div>
+
+  <div style="margin: 0 18px 20px; padding: 18px 18px 16px; border-radius: 20px; background: #2A211B; border: 1px solid #4A382A;">
+    <div style="display: flex; align-items: center; gap: 13px;">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#E9A35B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      <div>
+        <div style="font-size: 17px; font-weight: 500; color: #F5EDE6;">Two things to fix</div>
+        <div style="font-size: 13.5px; color: #C08B54; margin-top: 3px;">Until then, your alarm may not ring.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 0 18px;">
+    <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase; margin: 0 4px 10px;">Needs attention</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+
+      <div style="display: flex; align-items: center; gap: 13px; min-height: 74px; padding: 14px; border-radius: 16px; background: #1E1815; border: 1px solid #3A2E24;">
+        <div style="width: 9px; height: 9px; border-radius: 5px; background: #E9A35B; flex-shrink: 0;"></div>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15.5px; color: #F5EDE6; font-weight: 500;">Autostart</div>
+          <div style="font-size: 13px; color: #9C8E84; margin-top: 3px; line-height: 1.45; text-wrap: pretty;">Off &mdash; alarms won't survive a restart.</div>
+        </div>
+        <button style="height: 44px; padding: 0 18px; border: none; border-radius: 12px; background: #E9A35B; color: #1B120A; font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Fix</button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 13px; min-height: 74px; padding: 14px; border-radius: 16px; background: #1E1815; border: 1px solid #3A2E24;">
+        <div style="width: 9px; height: 9px; border-radius: 5px; background: #E9A35B; flex-shrink: 0;"></div>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15.5px; color: #F5EDE6; font-weight: 500;">Battery saver</div>
+          <div style="font-size: 13px; color: #9C8E84; margin-top: 3px; line-height: 1.45; text-wrap: pretty;">Restricted &mdash; Duet may be closed overnight.</div>
+        </div>
+        <button style="height: 44px; padding: 0 18px; border: none; border-radius: 12px; background: #E9A35B; color: #1B120A; font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Fix</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 22px 18px 0;">
+    <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase; margin: 0 4px 10px;">All good</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+
+      <div style="display: flex; align-items: center; gap: 13px; min-height: 58px; padding: 12px 14px; border-radius: 16px; background: #1B1613;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5FB3AE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15px; color: #C9BAAF;">Notifications</div>
+          <div style="font-size: 12.5px; color: #6E625B; margin-top: 2px;">Allowed</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 13px; min-height: 58px; padding: 12px 14px; border-radius: 16px; background: #1B1613;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5FB3AE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15px; color: #C9BAAF;">Exact alarms</div>
+          <div style="font-size: 12.5px; color: #6E625B; margin-top: 2px;">Allowed &mdash; rings to the second</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 13px; min-height: 58px; padding: 12px 14px; border-radius: 16px; background: #1B1613;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5FB3AE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15px; color: #C9BAAF;">Show on lock screen</div>
+          <div style="font-size: 12.5px; color: #6E625B; margin-top: 2px;">Allowed</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 13px; min-height: 58px; padding: 12px 14px; border-radius: 16px; background: #1B1613;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5FB3AE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15px; color: #C9BAAF;">Do Not Disturb</div>
+          <div style="font-size: 12.5px; color: #6E625B; margin-top: 2px;">Duet can ring through it</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <div style="padding: 0 18px 28px;">
+    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 14px; border-radius: 14px; background: #1B1613;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E625B" stroke-width="1.8" stroke-linecap="round" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span style="font-size: 12.5px; color: #7C6E66; line-height: 1.5; text-wrap: pretty;">We re-check these every week and tell you if anything changes.</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

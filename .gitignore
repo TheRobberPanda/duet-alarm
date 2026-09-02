@@ -1,0 +1,30 @@
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+.packages
+
+# pubspec.lock IS committed: this is an application, not a library,
+# so pinned dependency versions are what make builds reproducible.
+
+# Android
+app/android/.gradle/
+app/android/local.properties
+app/android/app/debug/
+app/android/app/release/
+*.jks
+*.keystore
+key.properties
+
+# Design canvas build output (re-seeded from the .dc.html sources)
+design/duet-alarm-clock.html
+
+# Staging dir used during scaffolding
+_staging/
+
+# Editors / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

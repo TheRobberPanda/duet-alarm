@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171310; color: #F5EDE6;
+           font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    a { color: #E9A35B; } a:hover { color: #F2BC80; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden; background: #171310;">
+
+  <div style="padding: 22px 22px 18px;">
+    <h1 style="font-size: 27px; font-weight: 500; margin: 0; letter-spacing: -0.2px;">Settings</h1>
+  </div>
+
+  <div style="padding: 0 18px;">
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 17px; background: #1E1815;">
+      <div style="width: 46px; height: 46px; border-radius: 23px; background: #22302E; border: 1.5px solid #5FB3AE; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #5FB3AE; font-weight: 500; flex-shrink: 0;">A</div>
+      <div style="flex-grow: 1;">
+        <div style="font-size: 16.5px; color: #F5EDE6; font-weight: 500;">Alex</div>
+        <div style="font-size: 13px; color: #7C6E66; margin-top: 3px;">Oslo &middot; UTC+1</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <div style="padding: 24px 18px 0;">
+    <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase; margin: 0 4px 10px;">Your pair</div>
+
+    <div style="padding: 16px; border-radius: 17px; background: #1E1815;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 21px; background: #2F2519; border: 1.5px solid #E9A35B; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #E9A35B; font-weight: 500; flex-shrink: 0;">S</div>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 16px; color: #F5EDE6; font-weight: 500;">Sam</div>
+          <div style="font-size: 13px; color: #7C6E66; margin-top: 3px;">Lisbon &middot; paired since 14 Jan</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; background: #1F2A28; flex-shrink: 0;">
+          <div style="width: 6px; height: 6px; border-radius: 3px; background: #5FB3AE;"></div>
+          <span style="font-size: 12px; color: #79A5A1; font-weight: 500;">Online</span>
+        </div>
+      </div>
+      <button style="width: 100%; height: 44px; margin-top: 14px; border: 1px solid #2E2621; border-radius: 12px; background: transparent; color: #9C8E84; font-family: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer;">Unpair from Sam</button>
+    </div>
+  </div>
+
+  <div style="padding: 24px 18px 0;">
+    <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase; margin: 0 4px 10px;">Alarms</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+
+      <div style="padding: 15px 16px; border-radius: 16px; background: #1E1815;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="flex-grow: 1;">
+            <div style="font-size: 15.5px; color: #F5EDE6;">Let Sam dismiss my alarms</div>
+          </div>
+          <div style="width: 50px; height: 30px; border-radius: 15px; background: #E9A35B; display: flex; align-items: center; justify-content: flex-end; padding: 3px; flex-shrink: 0;">
+            <div style="width: 24px; height: 24px; border-radius: 12px; background: #1B120A;"></div>
+          </div>
+        </div>
+        <div style="font-size: 12.5px; color: #7C6E66; margin-top: 8px; line-height: 1.45; text-wrap: pretty;">When off, Sam can still snooze their own phone &mdash; but never yours.</div>
+      </div>
+
+      <div style="display: flex; align-items: center; min-height: 56px; padding: 0 16px; border-radius: 16px; background: #1E1815;">
+        <span style="font-size: 15.5px; color: #C9BAAF; flex-grow: 1;">Alarm health</span>
+        <div style="display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 12px; background: #2F2519; margin-right: 8px;">
+          <span style="font-size: 12px; color: #C08B54; font-weight: 600;">2 to fix</span>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div style="display: flex; align-items: center; min-height: 56px; padding: 0 16px; border-radius: 16px; background: #1E1815;">
+        <span style="font-size: 15.5px; color: #C9BAAF; flex-grow: 1;">Default snooze</span>
+        <span style="font-size: 15px; color: #9C8E84; margin-right: 8px;">9 min</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 24px 18px 0;">
+    <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase; margin: 0 4px 10px;">Purchases</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; min-height: 62px; padding: 0 16px; border-radius: 16px; background: #2A211B; border: 1px solid #4A382A;">
+        <div style="flex-grow: 1;">
+          <div style="font-size: 15.5px; color: #F5EDE6; font-weight: 500;">Duet Full</div>
+          <div style="font-size: 12.5px; color: #C08B54; margin-top: 3px;">Bought by Sam &middot; covers you both</div>
+        </div>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#E9A35B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <div style="display: flex; align-items: center; min-height: 56px; padding: 0 16px; border-radius: 16px; background: #1E1815;">
+        <span style="font-size: 15.5px; color: #C9BAAF; flex-grow: 1;">Themes</span>
+        <span style="font-size: 14.5px; color: #9C8E84; margin-right: 8px;">Ember</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div style="display: flex; align-items: center; min-height: 52px; padding: 0 16px; border-radius: 16px; background: #1B1613;">
+        <span style="font-size: 15px; color: #9C8E84; flex-grow: 1;">Restore purchases</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <div style="padding: 0 18px 12px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; min-height: 52px; padding: 0 16px; border-radius: 16px; background: #1B1613;">
+        <span style="font-size: 15px; color: #9C8E84; flex-grow: 1;">Download my data</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div style="display: flex; align-items: center; min-height: 52px; padding: 0 16px; border-radius: 16px; background: #1B1613;">
+        <span style="font-size: 15px; color: #C98274; flex-grow: 1;">Delete my account</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A4C44" stroke-width="1.8" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align: center; padding-bottom: 26px;">
+    <span style="font-size: 12px; color: #4A403A;">Duet 1.0.0</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

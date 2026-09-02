@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171310; color: #F5EDE6;
+           font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    a { color: #E9A35B; } a:hover { color: #F2BC80; }
+    @keyframes duetPulse {
+      0%, 100% { opacity: 0.15; transform: scale(1); }
+      50%      { opacity: 0.45; transform: scale(1.06); }
+    }
+    .pulse-a { animation: duetPulse 3.2s ease-in-out infinite; transform-origin: center; }
+    .pulse-b { animation: duetPulse 3.2s ease-in-out infinite 1.6s; transform-origin: center; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; position: relative; overflow: hidden; background: #171310;">
+
+  <div style="position: absolute; top: -180px; left: -90px; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, rgba(233,163,91,0.18) 0%, rgba(233,163,91,0) 70%);"></div>
+  <div style="position: absolute; top: -140px; right: -110px; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(95,179,174,0.16) 0%, rgba(95,179,174,0) 70%);"></div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 32px; position: relative;">
+
+    <svg width="300" height="260" viewBox="0 0 300 260" fill="none" style="margin-bottom: 8px;">
+      <g class="pulse-a">
+        <circle cx="96" cy="126" r="74" stroke="#E9A35B" stroke-width="1.5" opacity="0.5"/>
+        <circle cx="96" cy="126" r="98" stroke="#E9A35B" stroke-width="1" opacity="0.3"/>
+      </g>
+      <g class="pulse-b">
+        <circle cx="204" cy="126" r="74" stroke="#5FB3AE" stroke-width="1.5" opacity="0.5"/>
+        <circle cx="204" cy="126" r="98" stroke="#5FB3AE" stroke-width="1" opacity="0.3"/>
+      </g>
+      <rect x="60" y="70" width="72" height="122" rx="14" fill="#221B17" stroke="#E9A35B" stroke-width="1.5"/>
+      <text x="96" y="126" fill="#E9A35B" font-family="'Hanken Grotesk', sans-serif" font-size="19" font-weight="300" letter-spacing="1" text-anchor="middle">06:40</text>
+      <text x="96" y="146" fill="#8A7466" font-family="'Hanken Grotesk', sans-serif" font-size="10" letter-spacing="0.6" text-anchor="middle">SAM</text>
+      <rect x="168" y="70" width="72" height="122" rx="14" fill="#221B17" stroke="#5FB3AE" stroke-width="1.5"/>
+      <text x="204" y="126" fill="#5FB3AE" font-family="'Hanken Grotesk', sans-serif" font-size="19" font-weight="300" letter-spacing="1" text-anchor="middle">06:40</text>
+      <text x="204" y="146" fill="#5E7C79" font-family="'Hanken Grotesk', sans-serif" font-size="10" letter-spacing="0.6" text-anchor="middle">ALEX</text>
+    </svg>
+
+    <h1 style="font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; font-weight: 400; line-height: 1.06; letter-spacing: -0.5px; margin: 20px 0 0; text-align: center; text-wrap: pretty;">An alarm<br>you share.</h1>
+
+    <p style="font-size: 17px; line-height: 1.55; color: #B2A398; margin: 18px 0 0; text-align: center; max-width: 268px; text-wrap: pretty;">Both phones ring. Either of you can turn it off &mdash; and you pick the sound they wake up to.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px; padding: 0 24px 20px;">
+    <button style="height: 56px; border: none; border-radius: 16px; background: #E9A35B; color: #1B120A; font-family: inherit; font-size: 17px; font-weight: 600; letter-spacing: 0.1px; cursor: pointer;">Get started</button>
+    <button style="height: 52px; border: 1px solid #352C27; border-radius: 16px; background: transparent; color: #C9BAAF; font-family: inherit; font-size: 16px; font-weight: 500; cursor: pointer;">I have an invite code</button>
+  </div>
+
+  <div style="display: flex; gap: 7px; justify-content: center; padding-bottom: 30px;">
+    <div style="width: 22px; height: 4px; border-radius: 2px; background: #E9A35B;"></div>
+    <div style="width: 4px; height: 4px; border-radius: 2px; background: #3A302A;"></div>
+    <div style="width: 4px; height: 4px; border-radius: 2px; background: #3A302A;"></div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

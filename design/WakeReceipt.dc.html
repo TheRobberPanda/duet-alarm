@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171310; color: #F5EDE6;
+           font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    a { color: #E9A35B; } a:hover { color: #F2BC80; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; position: relative; overflow: hidden; background: #171310;">
+
+  <div style="position: absolute; top: -60px; left: 50%; margin-left: -200px; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(233,163,91,0.15) 0%, rgba(233,163,91,0) 68%);"></div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 22px; position: relative;">
+
+    <div style="display: flex; justify-content: center; margin-bottom: 26px;">
+      <svg width="88" height="88" viewBox="0 0 88 88" fill="none">
+        <circle cx="44" cy="44" r="40" stroke="#2A231E" stroke-width="1.5"/>
+        <path d="M44 4 A40 40 0 0 1 44 84" stroke="#5FB3AE" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M44 84 A40 40 0 0 1 44 4" stroke="#E9A35B" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M32 45l8.5 8.5L58 36" stroke="#F5EDE6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <h1 style="font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; font-weight: 400; line-height: 1.1; margin: 0; text-align: center; letter-spacing: -0.3px;">You're both up.</h1>
+    <p style="font-size: 15.5px; color: #9C8E84; margin: 12px 0 0; text-align: center;">Thursday, 6 March &middot; Gym</p>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 34px;">
+
+      <div style="padding: 20px 16px 18px; border-radius: 20px; background: #1B2422; border: 1px solid #2C3D3A;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 26px; height: 26px; border-radius: 13px; background: #22302E; border: 1.5px solid #5FB3AE; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #5FB3AE; font-weight: 500;">A</div>
+          <span style="font-size: 14.5px; color: #79A5A1; font-weight: 500;">You</span>
+        </div>
+        <div style="font-size: 34px; font-weight: 200; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin-top: 14px; color: #F5EDE6;">06:42</div>
+        <div style="font-size: 13px; color: #5E7C79; margin-top: 6px;">No snoozes</div>
+        <div style="display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 12px; background: #22302E; margin-top: 12px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5FB3AE" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+          <span style="font-size: 11.5px; color: #5FB3AE; font-weight: 600;">UP FIRST</span>
+        </div>
+      </div>
+
+      <div style="padding: 20px 16px 18px; border-radius: 20px; background: #241D18; border: 1px solid #3A2E24;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 26px; height: 26px; border-radius: 13px; background: #2F2519; border: 1.5px solid #E9A35B; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #E9A35B; font-weight: 500;">S</div>
+          <span style="font-size: 14.5px; color: #C08B54; font-weight: 500;">Sam</span>
+        </div>
+        <div style="font-size: 34px; font-weight: 200; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin-top: 14px; color: #F5EDE6;">06:51</div>
+        <div style="font-size: 13px; color: #8A6E52; margin-top: 6px;">1 snooze</div>
+        <div style="display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 12px; background: #2F2519; margin-top: 12px;">
+          <span style="font-size: 11.5px; color: #C08B54; font-weight: 600;">9 MIN LATER</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; padding: 18px 20px; border-radius: 20px; background: #1E1815;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-size: 12px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase;">Together</div>
+          <div style="font-size: 22px; font-weight: 500; margin-top: 5px;">12 mornings</div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#5FB3AE" stroke-width="1.6" stroke-dasharray="18.8 18.8" transform="rotate(-90 7 7)"/><circle cx="7" cy="7" r="6" fill="none" stroke="#E9A35B" stroke-width="1.6" stroke-dasharray="18.8 18.8" stroke-dashoffset="-18.8" transform="rotate(-90 7 7)"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#5FB3AE" stroke-width="1.6" stroke-dasharray="18.8 18.8" transform="rotate(-90 7 7)"/><circle cx="7" cy="7" r="6" fill="none" stroke="#E9A35B" stroke-width="1.6" stroke-dasharray="18.8 18.8" stroke-dashoffset="-18.8" transform="rotate(-90 7 7)"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#5FB3AE" stroke-width="1.6" stroke-dasharray="18.8 18.8" transform="rotate(-90 7 7)"/><circle cx="7" cy="7" r="6" fill="none" stroke="#E9A35B" stroke-width="1.6" stroke-dasharray="18.8 18.8" stroke-dashoffset="-18.8" transform="rotate(-90 7 7)"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#5FB3AE" stroke-width="1.6" stroke-dasharray="18.8 18.8" transform="rotate(-90 7 7)"/><circle cx="7" cy="7" r="6" fill="none" stroke="#E9A35B" stroke-width="1.6" stroke-dasharray="18.8 18.8" stroke-dashoffset="-18.8" transform="rotate(-90 7 7)"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#5FB3AE" stroke-width="1.6" stroke-dasharray="18.8 18.8" transform="rotate(-90 7 7)"/><circle cx="7" cy="7" r="6" fill="none" stroke="#E9A35B" stroke-width="1.6" stroke-dasharray="18.8 18.8" stroke-dashoffset="-18.8" transform="rotate(-90 7 7)"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#2E2621" stroke-width="1.6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#2E2621" stroke-width="1.6"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 0 22px 34px; position: relative;">
+    <button style="width: 100%; height: 54px; border: none; border-radius: 16px; background: #E9A35B; color: #1B120A; font-family: inherit; font-size: 16.5px; font-weight: 600; cursor: pointer;">Good morning</button>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

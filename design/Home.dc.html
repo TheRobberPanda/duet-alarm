@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171310; color: #F5EDE6;
+           font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    a { color: #E9A35B; } a:hover { color: #F2BC80; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; position: relative; overflow: hidden; background: #171310;">
+
+  <div style="display: flex; align-items: center; gap: 12px; padding: 18px 20px 16px; border-bottom: 1px solid #241D19;">
+    <svg width="42" height="30" viewBox="0 0 42 30" fill="none">
+      <circle cx="14" cy="15" r="12" fill="#2A211B" stroke="#E9A35B" stroke-width="1.5"/>
+      <text x="14" y="20" fill="#E9A35B" font-family="'Hanken Grotesk', sans-serif" font-size="12" font-weight="500" text-anchor="middle">S</text>
+      <circle cx="28" cy="15" r="12" fill="#1B2422" stroke="#5FB3AE" stroke-width="1.5"/>
+      <text x="28" y="20" fill="#5FB3AE" font-family="'Hanken Grotesk', sans-serif" font-size="12" font-weight="500" text-anchor="middle">A</text>
+    </svg>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 14.5px; font-weight: 500; color: #E8DAD0;">Sam &middot; 05:40 in Lisbon</div>
+      <div style="font-size: 12.5px; color: #7C6E66;">Same wake-up as you tomorrow</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; background: #1F2A28;">
+      <div style="width: 6px; height: 6px; border-radius: 3px; background: #5FB3AE;"></div>
+      <span style="font-size: 12px; color: #79A5A1; font-weight: 500;">Synced</span>
+    </div>
+  </div>
+
+  <div style="margin: 20px 20px 0; padding: 22px 22px 20px; border-radius: 22px; background: linear-gradient(160deg, #251E19 0%, #1C1613 100%); border: 1px solid #33292E;">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+      <div>
+        <div style="font-size: 12px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase;">Next alarm</div>
+        <div style="font-size: 56px; font-weight: 200; letter-spacing: 1px; line-height: 1.05; margin-top: 8px; font-variant-numeric: tabular-nums; color: #F5EDE6;">06:40</div>
+        <div style="font-size: 15px; color: #C9BAAF; margin-top: 4px;">Gym &middot; tomorrow</div>
+      </div>
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+        <circle cx="28" cy="28" r="25" stroke="#302823" stroke-width="2"/>
+        <path d="M28 3 A25 25 0 0 1 28 53" stroke="#5FB3AE" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M28 53 A25 25 0 0 1 28 3" stroke="#E9A35B" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="display: flex; align-items: center; gap: 7px; margin-top: 16px; padding-top: 15px; border-top: 1px solid #2B231E;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C6E66" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span style="font-size: 13.5px; color: #9C8E84;">Rings in 8h 12m on both phones</span>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 26px 22px 10px;">
+    <div style="font-size: 12px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase;">All alarms</div>
+    <div style="font-size: 13px; color: #7C6E66;">4 shared</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; padding: 0 16px;">
+
+    <div style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 12px 14px; border-radius: 16px; background: #1E1815;">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style="flex-shrink: 0;">
+        <circle cx="13" cy="13" r="11" stroke="#302823" stroke-width="1.6"/>
+        <path d="M13 2 A11 11 0 0 1 13 24" stroke="#5FB3AE" stroke-width="2" stroke-linecap="round"/>
+        <path d="M13 24 A11 11 0 0 1 13 2" stroke="#E9A35B" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: baseline; gap: 9px;">
+          <span style="font-size: 27px; font-weight: 300; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;">06:40</span>
+          <span style="font-size: 15px; color: #C9BAAF;">Gym</span>
+        </div>
+        <div style="font-size: 12.5px; color: #7C6E66;">Mon &ndash; Fri &middot; both of us</div>
+      </div>
+      <div style="width: 50px; height: 30px; border-radius: 15px; background: #E9A35B; display: flex; align-items: center; justify-content: flex-end; padding: 3px; flex-shrink: 0;">
+        <div style="width: 24px; height: 24px; border-radius: 12px; background: #1B120A;"></div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 12px 14px; border-radius: 16px; background: #1E1815;">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style="flex-shrink: 0;">
+        <circle cx="13" cy="13" r="11" stroke="#302823" stroke-width="1.6"/>
+        <path d="M13 2 A11 11 0 0 1 13 24" stroke="#E9A35B" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: baseline; gap: 9px;">
+          <span style="font-size: 27px; font-weight: 300; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;">07:15</span>
+          <span style="font-size: 15px; color: #C9BAAF;">Wake Sam gently</span>
+        </div>
+        <div style="font-size: 12.5px; color: #7C6E66;">Sat, Sun &middot; only Sam</div>
+      </div>
+      <div style="width: 50px; height: 30px; border-radius: 15px; background: #E9A35B; display: flex; align-items: center; justify-content: flex-end; padding: 3px; flex-shrink: 0;">
+        <div style="width: 24px; height: 24px; border-radius: 12px; background: #1B120A;"></div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 12px 14px; border-radius: 16px; background: #1E1815;">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style="flex-shrink: 0;">
+        <circle cx="13" cy="13" r="11" stroke="#302823" stroke-width="1.6"/>
+        <path d="M13 2 A11 11 0 0 1 13 24" stroke="#5FB3AE" stroke-width="2" stroke-linecap="round"/>
+        <path d="M13 24 A11 11 0 0 1 13 2" stroke="#E9A35B" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: baseline; gap: 9px;">
+          <span style="font-size: 27px; font-weight: 300; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;">05:00</span>
+          <span style="font-size: 15px; color: #C9BAAF;">Your flight</span>
+        </div>
+        <div style="font-size: 12.5px; color: #7C6E66;">Fri 14 Mar &middot; both of us</div>
+      </div>
+      <div style="width: 50px; height: 30px; border-radius: 15px; background: #E9A35B; display: flex; align-items: center; justify-content: flex-end; padding: 3px; flex-shrink: 0;">
+        <div style="width: 24px; height: 24px; border-radius: 12px; background: #1B120A;"></div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 12px 14px; border-radius: 16px; background: #1B1613; opacity: 0.55;">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style="flex-shrink: 0;">
+        <circle cx="13" cy="13" r="11" stroke="#302823" stroke-width="1.6"/>
+      </svg>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px;">
+        <div style="display: flex; align-items: baseline; gap: 9px;">
+          <span style="font-size: 27px; font-weight: 300; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;">09:30</span>
+          <span style="font-size: 15px; color: #C9BAAF;">Nap</span>
+        </div>
+        <div style="font-size: 12.5px; color: #7C6E66;">Off</div>
+      </div>
+      <div style="width: 50px; height: 30px; border-radius: 15px; background: #2E2621; display: flex; align-items: center; justify-content: flex-start; padding: 3px; flex-shrink: 0;">
+        <div style="width: 24px; height: 24px; border-radius: 12px; background: #5A4C44;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <div style="padding: 0 20px 28px;">
+    <button style="width: 100%; height: 56px; border: none; border-radius: 17px; background: #E9A35B; color: #1B120A; font-family: inherit; font-size: 16.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1B120A" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New shared alarm
+    </button>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

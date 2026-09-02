@@ -1,0 +1,33 @@
+{
+  "artboards": [
+    { "file": "Onboarding.dc.html",      "x": 0,    "y": 0,    "w": 390, "h": 844, "title": "1 · Onboarding" },
+    { "file": "PairSetup.dc.html",       "x": 470,  "y": 0,    "w": 390, "h": 844, "title": "2 · Pair setup" },
+    { "file": "Home.dc.html",            "x": 940,  "y": 0,    "w": 390, "h": 844, "title": "3 · Home" },
+    { "file": "AlarmEditor.dc.html",     "x": 1410, "y": 0,    "w": 390, "h": 844, "title": "4 · Alarm editor" },
+    { "file": "SoundPicker.dc.html",     "x": 0,    "y": 964,  "w": 390, "h": 844, "title": "5 · Sound picker" },
+    { "file": "Main.dc.html",            "x": 470,  "y": 964,  "w": 390, "h": 844, "title": "6 · Ringing" },
+    { "file": "RingingLive.dc.html",     "x": 940,  "y": 964,  "w": 390, "h": 844, "title": "7 · Ringing — partner snoozed" },
+    { "file": "WakeReceipt.dc.html",     "x": 1410, "y": 964,  "w": 390, "h": 844, "title": "8 · Wake receipt" },
+    { "file": "PermissionHealth.dc.html","x": 0,    "y": 1928, "w": 390, "h": 844, "title": "9 · Alarm health" },
+    { "file": "Paywall.dc.html",         "x": 470,  "y": 1928, "w": 390, "h": 844, "title": "10 · Paywall" },
+    { "file": "Settings.dc.html",        "x": 940,  "y": 1928, "w": 390, "h": 844, "title": "11 · Settings" },
+    { "file": "Themes.dc.html",          "x": 1410, "y": 1928, "w": 390, "h": 844, "title": "12 · Themes" }
+  ],
+  "annotations": [
+    {
+      "id": "note-two-tone",
+      "x": 0,
+      "y": -190,
+      "w": 400,
+      "text": "The two-tone system\n\nEach partner gets an accent, assigned at pairing: Sam = amber, Alex (you) = teal. Every shared element carries both — the split ring on an alarm row, the paired avatars, the wake receipt. A glance tells you which half is yours."
+    },
+    {
+      "id": "note-ring-hierarchy",
+      "x": 470,
+      "y": -190,
+      "w": 400,
+      "text": "Ringing screen hierarchy\n\nThe two big buttons stop YOUR phone only. The \"for both of us\" row is smaller, dimmer, and press-and-hold. Dismissing your partner's alarm by accident is the worst thing this app can do, so that action is deliberate by design."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

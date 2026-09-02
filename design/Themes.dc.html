@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171310; color: #F5EDE6;
+           font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    a { color: #E9A35B; } a:hover { color: #F2BC80; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden; background: #171310;">
+
+  <div style="display: flex; align-items: center; height: 56px; padding: 0 8px; flex-shrink: 0;">
+    <button style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B2A398" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+  </div>
+
+  <div style="padding: 4px 22px 18px;">
+    <h1 style="font-size: 27px; font-weight: 500; margin: 0; letter-spacing: -0.2px;">Theme</h1>
+    <p style="font-size: 14.5px; color: #9C8E84; margin: 8px 0 0; line-height: 1.5; text-wrap: pretty;">A theme sets both your colours. You each keep your own.</p>
+  </div>
+
+  <div style="margin: 0 18px 22px; padding: 20px; border-radius: 20px; background: #1E1815;">
+    <div style="display: flex; align-items: center; gap: 18px;">
+      <svg width="76" height="76" viewBox="0 0 76 76" fill="none" style="flex-shrink: 0;">
+        <circle cx="38" cy="38" r="34" stroke="#2A231E" stroke-width="1.5"/>
+        <path d="M38 4 A34 34 0 0 1 38 72" stroke="#5FB3AE" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M38 72 A34 34 0 0 1 38 4" stroke="#E9A35B" stroke-width="2.5" stroke-linecap="round"/>
+        <text x="38" y="44" fill="#F5EDE6" font-family="'Hanken Grotesk', sans-serif" font-size="17" font-weight="300" letter-spacing="0.5" text-anchor="middle">06:40</text>
+      </svg>
+      <div style="flex-grow: 1;">
+        <div style="font-size: 12px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase;">Current</div>
+        <div style="font-size: 20px; font-weight: 500; margin-top: 5px;">Ember</div>
+        <div style="display: flex; gap: 14px; margin-top: 14px;">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 11.5px; color: #6E625B;">You</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="width: 16px; height: 16px; border-radius: 8px; background: #5FB3AE;"></div>
+              <span style="font-size: 13px; color: #C9BAAF;">Teal</span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 11.5px; color: #6E625B;">Sam</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="width: 16px; height: 16px; border-radius: 8px; background: #E9A35B;"></div>
+              <span style="font-size: 13px; color: #C9BAAF;">Amber</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 0 18px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin: 0 4px 12px;">
+      <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase;">Included</div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+
+      <div style="padding: 12px; border-radius: 16px; background: #211A16; border: 1.5px solid #E9A35B;">
+        <div style="height: 44px; border-radius: 10px; background: #171310; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #E9A35B;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #5FB3AE;"></div>
+        </div>
+        <div style="font-size: 13px; color: #F5EDE6; margin-top: 9px; font-weight: 500;">Ember</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #0E0E0F; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #E8E4DE;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #7A7A80;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Mono</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #101A1E; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #6BA5C9;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #93B8A6;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Harbour</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 24px 18px 0;">
+    <div style="display: flex; align-items: center; gap: 9px; margin: 0 4px 12px;">
+      <div style="font-size: 11.5px; letter-spacing: 1.3px; color: #7C6E66; text-transform: uppercase;">Theme pack</div>
+      <div style="display: flex; align-items: center; gap: 5px; height: 21px; padding: 0 8px; border-radius: 11px; background: #2F2519;">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#E9A35B" stroke-width="2.6" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+        <span style="font-size: 11px; font-weight: 700; color: #E9A35B; letter-spacing: 0.2px;">$3.99</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #1C1216; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #F0A0B8;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #C98FD4;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Blush</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #16121C; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #A98BE0;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #7FA3E8;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Orchid</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #12181A; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #9BC48F;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #D3C287;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Sage</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #1C1411; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #DE8663;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #E3B27A;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Terracotta</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #0D1114; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #5AE0C0;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #F06BA8;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Neon</div>
+      </div>
+
+      <div style="padding: 12px; border-radius: 16px; background: #1B1613;">
+        <div style="height: 44px; border-radius: 10px; background: #F2ECE4; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #C4703F;"></div>
+          <div style="width: 13px; height: 13px; border-radius: 7px; background: #3E7C77;"></div>
+        </div>
+        <div style="font-size: 13px; color: #C9BAAF; margin-top: 9px;">Daylight</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <div style="padding: 0 18px 26px;">
+    <div style="padding: 15px 16px; border-radius: 16px; background: #1B1613; margin-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E625B" stroke-width="1.8" stroke-linecap="round" style="flex-shrink: 0;"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span style="font-size: 12.5px; color: #7C6E66; line-height: 1.45; text-wrap: pretty;">Themes are yours alone &mdash; Sam keeps whichever they picked.</span>
+      </div>
+    </div>
+    <button style="width: 100%; height: 54px; border: none; border-radius: 16px; background: #E9A35B; color: #1B120A; font-family: inherit; font-size: 16.5px; font-weight: 600; cursor: pointer;">Unlock 6 themes &middot; $3.99</button>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
