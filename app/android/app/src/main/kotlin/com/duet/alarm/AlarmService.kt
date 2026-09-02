@@ -6,7 +6,6 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.RingtoneManager
 import android.os.*
 import android.util.Log
 
@@ -44,7 +43,7 @@ class AlarmService : Service() {
         startForeground(NOTIF_ID, buildNotification(id, label))
 
         acquireWakeLock()
-        startAudio()
+        startAudio(def?.soundRef ?: "default")
         startVibration()
         RingLog.record(this, id, System.currentTimeMillis())
 
@@ -106,9 +105,12 @@ class AlarmService : Service() {
         ).apply { acquire(WAKE_TIMEOUT_MS) }
     }
 
-    private fun startAudio() {
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+    private fun startAudio(soundRef: String) {
+        val uri = SoundCatalog.resolve(this, soundRef)
+        if (uri == null) {
+            Log.e(TAG, "no playable sound for '$soundRef' -- alarm will be silent")
+            return
+        }
         try {
             player = MediaPlayer().apply {
                 setAudioAttributes(

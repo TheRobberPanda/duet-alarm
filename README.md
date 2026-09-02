@@ -30,9 +30,14 @@ both of you. You pick the sound the other person wakes up to.
 **Milestone 0** — alarm proven on hardware: rings 1.45 s late across a reboot,
 before first unlock. Tests 1, 2, 3, 9, 10 pass; 4–8 and 11–14 outstanding.
 
-**Milestone 2 in progress** — Supabase backend live (schema, RLS, verified
-against an attacker), Flutter wired to it: email sign-in, invite/redeem pairing,
-account deletion.
+**Milestone 2** — Supabase backend live (schema, RLS, verified against an
+attacker) and Flutter wired to it. Gated off behind `DUET_BACKEND` until the
+email template and SMTP are configured (supabase/README.md).
+
+**Milestone 3 in progress** — the app itself, running standalone: alarm list,
+editor, device-sound picker, alarm-health screen. No backend required, which
+ADR-001 makes possible: alarms are scheduled locally and the network only ever
+carries definitions.
 
 Budget: €0 (doc 10). Android-only; iOS deferred until there is revenue.
 

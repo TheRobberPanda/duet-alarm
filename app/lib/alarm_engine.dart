@@ -43,6 +43,22 @@ class AlarmEngine {
 
   static Future<bool> openSetting(String which) async =>
       await _channel.invokeMethod<bool>('openSetting', {'which': which}) ?? false;
+
+  /// Sounds available on this device. We ship no audio of our own — see
+  /// SoundCatalog.kt for why.
+  static Future<List<DeviceSound>> listSounds() async {
+    final raw = await _channel.invokeMethod<List<dynamic>>('listSounds') ?? [];
+    return raw
+        .map((e) => DeviceSound.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// Plays on the ALARM stream, exactly as the real alarm will — previewing on
+  /// the media stream would let someone choose a tone that is inaudible at 06:00.
+  static Future<void> previewSound(String soundRef) =>
+      _channel.invokeMethod('previewSound', {'soundRef': soundRef});
+
+  static Future<void> stopPreview() => _channel.invokeMethod('stopPreview');
 }
 
 class ArmedAlarm {
@@ -104,5 +120,22 @@ class AlarmHealth {
         lastBootReArm: m['lastBootReArm'] as String? ?? '',
         ringLog: m['ringLog'] as String? ?? '',
         missedLog: m['missedLog'] as String? ?? '',
+      );
+}
+
+
+class DeviceSound {
+  DeviceSound({required this.ref, required this.title, required this.kind});
+
+  final String ref;
+  final String title;
+  final String kind;
+
+  bool get isDefault => ref == 'default';
+
+  factory DeviceSound.fromMap(Map<String, dynamic> m) => DeviceSound(
+        ref: m['ref'] as String,
+        title: (m['title'] as String?) ?? 'Sound',
+        kind: (m['kind'] as String?) ?? 'alarm',
       );
 }

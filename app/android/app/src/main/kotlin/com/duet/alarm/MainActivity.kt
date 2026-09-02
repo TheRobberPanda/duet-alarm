@@ -72,6 +72,15 @@ class MainActivity : FlutterActivity() {
 
                     "health" -> result.success(PermissionChecks.status(this))
 
+                    "listSounds" -> result.success(SoundCatalog.list(this))
+
+                    "previewSound" -> {
+                        SoundCatalog.preview(this, call.argument<String>("soundRef") ?: "default")
+                        result.success(null)
+                    }
+
+                    "stopPreview" -> { SoundCatalog.stopPreview(); result.success(null) }
+
                     "openSetting" -> result.success(
                         PermissionChecks.openSetting(this, call.argument<String>("which")!!)
                     )
