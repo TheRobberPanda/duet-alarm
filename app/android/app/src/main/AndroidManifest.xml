@@ -44,9 +44,16 @@
         <!-- The ringing screen. Its own task so dismissing it never returns the
              user into the Flutter app, and excluded from Recents so a stale
              ringing screen cannot be resurrected by accident. -->
+        <!-- directBootAware so the ringing screen can appear before the user has
+             unlocked. After an overnight reboot the service (also direct-boot
+             aware) plays audio regardless, but without this the screen cannot
+             launch until first unlock — an alarm you can hear and cannot turn
+             off. Safe here because this Activity reads only device-protected
+             storage and draws plain views with no dependencies. -->
         <activity
             android:name=".RingingActivity"
             android:exported="false"
+            android:directBootAware="true"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
             android:showOnLockScreen="true"

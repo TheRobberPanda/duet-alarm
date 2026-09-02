@@ -142,8 +142,16 @@ wrong. Two real defects surfaced instead:
 After the fix the alarm re-armed during direct boot and fired 1.45 s late,
 *before* `BOOT_COMPLETED` arrived — i.e. before first unlock.
 
-**Still open:** `RingingActivity` is not direct-boot aware, so it is unverified
-whether the full-screen ringing UI appears pre-unlock, or only the audio plays.
+The screen did appear — but the alarm fired 0.7 s before `BOOT_COMPLETED`, i.e.
+the phone was unlocked about a second after it started ringing, so that run
+cannot distinguish "shown pre-unlock" from "shown the instant it was unlocked".
+`RingingActivity` is now also `directBootAware`, which removes the question:
+without it the screen cannot launch until first unlock, leaving an alarm you can
+hear but cannot turn off.
+
+**To verify:** arm ~3 minutes out, reboot, and then leave the phone alone and
+locked when it rings. If the ringing screen is on the lock screen before you
+touch it, direct-boot UI works.
 
 ## What "done" looks like
 
