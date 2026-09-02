@@ -12,9 +12,16 @@ import android.util.Log
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        Log.i(TAG, "re-arming after ${intent.action}")
-        AlarmScheduler.reconcile(context)
-        BootLog.record(context, intent.action ?: "unknown")
+        // A crash in here means no alarm is ever re-armed, and the user finds
+        // out by oversleeping. Nothing in this receiver may be allowed to throw.
+        try {
+            Log.i(TAG, "re-arming after ${intent.action}")
+            AlarmScheduler.reconcile(context)
+            BootLog.record(context, intent.action ?: "unknown")
+        } catch (t: Throwable) {
+            Log.e(TAG, "re-arm FAILED after ${intent.action}", t)
+            BootLog.record(context, "FAILED ${intent.action}: ${t.javaClass.simpleName}")
+        }
     }
 
     companion object { private const val TAG = "DuetBoot" }
@@ -24,9 +31,10 @@ class BootReceiver : BroadcastReceiver() {
 object BootLog {
     private const val PREFS = "duet_boot_log"
     fun record(ctx: Context, action: String) {
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString("last", "$action @ ${System.currentTimeMillis()}").commit()
     }
     fun last(ctx: Context): String? =
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("last", null)
+        ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString("last", null)
 }

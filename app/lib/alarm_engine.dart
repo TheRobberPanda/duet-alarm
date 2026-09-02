@@ -69,6 +69,7 @@ class AlarmHealth {
     required this.isAggressiveOem,
     required this.lastBootReArm,
     required this.ringLog,
+    required this.missedLog,
   });
 
   final bool exactAlarms;
@@ -79,6 +80,10 @@ class AlarmHealth {
   final bool isAggressiveOem;
   final String lastBootReArm;
   final String ringLog;
+
+  /// Alarms that were due while the app was not running. Never empty for a
+  /// good reason -- every entry is an alarm that silently did not ring.
+  final String missedLog;
 
   /// Autostart cannot be read programmatically on MIUI, so it is never counted
   /// as "passing" -- it is surfaced as an unverifiable item the user must check.
@@ -98,5 +103,6 @@ class AlarmHealth {
         isAggressiveOem: m['isAggressiveOem'] as bool? ?? false,
         lastBootReArm: m['lastBootReArm'] as String? ?? '',
         ringLog: m['ringLog'] as String? ?? '',
+        missedLog: m['missedLog'] as String? ?? '',
       );
 }

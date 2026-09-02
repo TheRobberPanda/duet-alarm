@@ -58,6 +58,7 @@
         <service
             android:name=".AlarmService"
             android:exported="false"
+            android:directBootAware="true"
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver

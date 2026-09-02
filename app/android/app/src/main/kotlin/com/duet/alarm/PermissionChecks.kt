@@ -24,7 +24,8 @@ object PermissionChecks {
         "manufacturer" to Build.MANUFACTURER,
         "isAggressiveOem" to isAggressiveOem(),
         "lastBootReArm" to (BootLog.last(ctx) ?: ""),
-        "ringLog" to RingLog.read(ctx)
+        "ringLog" to RingLog.read(ctx),
+        "missedLog" to MissedLog.read(ctx)
     )
 
     private fun notificationsAllowed(ctx: Context): Boolean {

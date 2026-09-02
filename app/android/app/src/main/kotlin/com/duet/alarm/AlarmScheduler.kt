@@ -65,10 +65,18 @@ object AlarmScheduler {
      * Called on boot, on package replace, on timezone change, and on app start.
      */
     fun reconcile(ctx: Context) {
-        AlarmStore.prune(ctx)
+        // Anything already overdue was missed while we were not running. Record
+        // it loudly rather than dropping it -- an alarm that silently did not
+        // ring is the failure this whole project exists to avoid.
+        val missed = AlarmStore.prune(ctx)
+        if (missed.isNotEmpty()) {
+            MissedLog.record(ctx, missed, "not running when due")
+            missed.forEach { Log.w(TAG, "MISSED ${it.id} due ${it.fireAtUtc} (${it.label})") }
+        }
+
         val defs = AlarmStore.all(ctx)
         defs.forEach { arm(ctx, it) }
-        Log.i(TAG, "reconciled ${defs.size} alarm(s)")
+        Log.i(TAG, "reconciled ${defs.size} alarm(s), ${missed.size} missed")
     }
 
     fun canScheduleExact(ctx: Context): Boolean {

@@ -256,6 +256,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ],
 
               const SizedBox(height: 26),
+              if ((h?.missedLog ?? '').isNotEmpty) ...[
+                _sectionLabel('Missed alarms'),
+                const SizedBox(height: 10),
+                _card(
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text(
+                      'These were due while the app was not running — they did '
+                      'not ring. Usually a reboot the app was not woken after.',
+                      style: TextStyle(color: _text, fontSize: 14, height: 1.45),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      h!.missedLog.trim(),
+                      style: const TextStyle(
+                          color: _amber, fontSize: 11.5, height: 1.5,
+                          fontFamily: 'monospace'),
+                    ),
+                  ]),
+                  border: _amber,
+                ),
+                const SizedBox(height: 26),
+              ],
+
               _sectionLabel('Evidence'),
               const SizedBox(height: 10),
               _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

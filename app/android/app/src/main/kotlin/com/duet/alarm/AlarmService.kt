@@ -185,10 +185,11 @@ class AlarmService : Service() {
 object RingLog {
     private const val PREFS = "duet_ring_log"
     fun record(ctx: Context, id: String, at: Long) {
-        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val p = ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val existing = p.getString("log", "") ?: ""
         p.edit().putString("log", "$id@$at\n$existing".take(4000)).commit()
     }
     fun read(ctx: Context): String =
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("log", "") ?: ""
+        ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString("log", "") ?: ""
 }
