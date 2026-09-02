@@ -4,6 +4,42 @@ Build order is chosen so the **riskiest thing gets proven first**. The risk in t
 project is not the UI or the backend; it is whether a shared alarm reliably rings
 on two phones. Prove that before building anything pretty.
 
+## Where things actually stand (2026-09-02)
+
+**Done**
+
+- **Milestone 0 — mostly.** The alarm engine works: exact scheduling, foreground
+  service, lock-screen ringing, direct-boot survival, snooze with a real
+  allowance, notification actions, self-perpetuating repeats, timezone
+  recomputation. Six of fourteen device tests pass (1, 2, 3, 9, 10, 11).
+- **Milestone 2 — backend built and verified.** Postgres schema, RLS tested
+  against a simulated attacker, pairing RPCs, account deletion. Flutter sign-in
+  and pairing screens exist but are **gated off** behind `DUET_BACKEND`.
+- **Milestone 3 — the local half.** The app is genuinely usable standalone:
+  alarm list, editor, device-sound picker, alarm-health screen.
+- Twelve-artboard design canvas; private GitHub repo.
+
+**Blocked on the outside world**
+
+- Supabase email template needs `{{ .Token }}`, and custom SMTP before any
+  real testers (supabase/README.md). Until then the backend stays gated off.
+- Play Console identity verification (address needs correcting), then the
+  12-tester / 14-day closed-test clock (docs/12 §1.3).
+
+**Not started**
+
+- Shared alarms over the network, the multiplayer ring session, the
+  "for both of us" controls, wake receipts, themes, missions, monetisation,
+  store listing.
+- **The app still ships Flutter's default launcher icon.** Small job, but it is
+  the first thing anyone sees.
+- No settings screen in the standalone app (the `allow_partner_dismiss` toggle
+  and profile live only in the gated-off pairing build).
+
+**The single most important outstanding item is Milestone 0 test 14** —
+overnight, offline, in a drawer. Everything else is building on an assumption
+that has not yet been proven for a full night.
+
 ## Milestone 0 — Prove the alarm (Android only)
 
 **Goal:** a phone in a drawer, offline, overnight, rings at 07:00.
