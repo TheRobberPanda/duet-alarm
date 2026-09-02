@@ -10,8 +10,11 @@ cd "$(dirname "$0")/.."
 source tool/env.sh
 
 MODE="${1:-debug}"
+shift || true
+# Remaining args go straight to the build, e.g.
+#   ./tool/install.sh debug --dart-define=DUET_BACKEND=true
 cd app
-flutter build apk --"$MODE"
+flutter build apk --"$MODE" "$@"
 APK="build/app/outputs/flutter-apk/app-$MODE.apk"
 
 adb push "$APK" /data/local/tmp/duet.apk

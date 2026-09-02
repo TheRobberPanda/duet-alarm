@@ -64,7 +64,7 @@ class _SignInScreenState extends State<SignInScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              const PairRing(size: 72),
+              const Center(child: PairRing(size: 72)),
               const SizedBox(height: 28),
               const Text('An alarm you share.',
                   style: TextStyle(fontSize: 30, height: 1.1, color: DuetColors.text)),

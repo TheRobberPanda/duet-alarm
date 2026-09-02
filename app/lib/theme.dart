@@ -138,9 +138,16 @@ class PairRing extends StatelessWidget {
   final double strokeWidth;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-        size: Size(size, size),
-        painter: _PairRingPainter(hasPartner: hasPartner, strokeWidth: strokeWidth),
+  Widget build(BuildContext context) => SizedBox(
+        // CustomPaint only honours `size` when it is otherwise unconstrained —
+        // inside a stretching Column it would expand to the full width and the
+        // ring would swallow the screen. The SizedBox pins it either way.
+        width: size,
+        height: size,
+        child: CustomPaint(
+          size: Size(size, size),
+          painter: _PairRingPainter(hasPartner: hasPartner, strokeWidth: strokeWidth),
+        ),
       );
 }
 
