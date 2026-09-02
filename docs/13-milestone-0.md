@@ -107,7 +107,7 @@ Each of these on the real Redmi, screen off, phone locked. Tick them off honestl
 |---|---|---|
 | 1 | Rings 30 seconds out with the app open | ✅ 12 ms late |
 | 2 | Rings 2 minutes out with the phone locked, face down | ✅ |
-| 3 | Ringing screen appears **over** the lock screen | ✅ normal boot |
+| 3 | Ringing screen appears **over** the lock screen | ✅ incl. pre-unlock after reboot |
 | 4 | Audio plays with media volume at zero (alarm stream) | |
 | 5 | Audio plays with Do Not Disturb on | |
 | 6 | Rings after 8 hours idle in a drawer (Doze) | |
@@ -142,16 +142,25 @@ wrong. Two real defects surfaced instead:
 After the fix the alarm re-armed during direct boot and fired 1.45 s late,
 *before* `BOOT_COMPLETED` arrived — i.e. before first unlock.
 
-The screen did appear — but the alarm fired 0.7 s before `BOOT_COMPLETED`, i.e.
-the phone was unlocked about a second after it started ringing, so that run
-cannot distinguish "shown pre-unlock" from "shown the instant it was unlocked".
-`RingingActivity` is now also `directBootAware`, which removes the question:
-without it the screen cannot launch until first unlock, leaving an alarm you can
-hear but cannot turn off.
+The screen appeared, but that first run could not prove *when*: the alarm fired
+0.7 s before `BOOT_COMPLETED`, so the phone was unlocked about a second into
+ringing. `RingingActivity` was then also marked `directBootAware` and the test
+repeated, leaving the phone untouched:
 
-**To verify:** arm ~3 minutes out, reboot, and then leave the phone alone and
-locked when it rings. If the ringing screen is on the lock screen before you
-touch it, direct-boot UI works.
+```
+17:43:29.977  LOCKED_BOOT_COMPLETED → re-armed 1 alarm    (direct boot)
+17:44:34.746  FIRED                                        (326 ms late)
+17:44:47.010  RingingActivity on screen
+17:45:07.567  BOOT_COMPLETED                               (first unlock)
+```
+
+The ringing screen was up **20 seconds before first unlock**. Audio, screen and
+dismissal all work before the device has ever been unlocked — the overnight
+reboot case is genuinely covered, not covered by luck.
+
+All four components in the ring path (`AlarmReceiver`, `AlarmService`,
+`BootReceiver`, `RingingActivity`) are `directBootAware`, and all alarm state is
+in device-protected storage. Nothing in the chain depends on an unlock.
 
 ## What "done" looks like
 
