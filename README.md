@@ -27,8 +27,14 @@ both of you. You pick the sound the other person wakes up to.
 
 ## Status
 
-**Milestone 0 in progress** — proving the alarm rings. Budget: €0 (doc 10).
-Android-only; iOS deferred until there is revenue.
+**Milestone 0** — alarm proven on hardware: rings 1.45 s late across a reboot,
+before first unlock. Tests 1, 2, 3, 9, 10 pass; 4–8 and 11–14 outstanding.
+
+**Milestone 2 in progress** — Supabase backend live (schema, RLS, verified
+against an attacker), Flutter wired to it: email sign-in, invite/redeem pairing,
+account deletion.
+
+Budget: €0 (doc 10). Android-only; iOS deferred until there is revenue.
 
 ```bash
 source tool/env.sh && cd app && flutter run

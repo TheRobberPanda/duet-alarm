@@ -21,6 +21,21 @@ Two rules do work that RLS alone cannot:
   no INSERT policy at all, so an uninvited join is impossible even for someone
   who knows the pair id.
 
+## Before sign-in will work — two things to check in the dashboard
+
+1. **The email template must include the code.** `signInWithOtp` +
+   `verifyOTP` needs a six-digit token, but Supabase's default Magic Link
+   template may only contain `{{ .ConfirmationURL }}`. Under
+   *Authentication → Email Templates → Magic Link*, make sure the body
+   includes `{{ .Token }}`. Without it the email arrives with a link and no
+   code, and the app's code field can never be satisfied.
+
+2. **The built-in SMTP is rate-limited to a handful of emails per hour** and is
+   explicitly for testing only. That is survivable while it is just you and one
+   test account; it is not survivable with twelve closed-test testers
+   (docs/12 §1.3). Configure custom SMTP — Resend's free tier is the usual
+   choice — *before* the beta, not during it.
+
 ## Migrations
 
 Files here mirror what is applied to the project, in order. They are the
