@@ -117,7 +117,7 @@ Each of these on the real Redmi, screen off, phone locked. Tick them off honestl
 | 10 | Survives an app update — arm, `flutter run` again, do not reopen | ✅ MY_PACKAGE_REPLACED re-arms |
 | 11 | Snooze re-rings 9 minutes later | |
 | 12 | Two alarms one minute apart both ring | |
-| 13 | Timezone change re-arms correctly | |
+| 13 | Timezone change re-arms correctly | ⚠ code in place, **needs a real device timezone change** |
 | 14 | **Overnight, offline, in a drawer, from 23:00 to 06:40** | |
 
 Test 14 is the milestone. The rest are the ways it fails.
@@ -161,6 +161,27 @@ reboot case is genuinely covered, not covered by luck.
 All four components in the ring path (`AlarmReceiver`, `AlarmService`,
 `BootReceiver`, `RingingActivity`) are `directBootAware`, and all alarm state is
 in device-protected storage. Nothing in the chain depends on an unlock.
+
+### Timezone changes need recomputation, not re-arming
+
+The store holds absolute instants, because that is what `AlarmManager` takes.
+But "07:00" means seven o'clock *wherever you are*. Re-arming the stored instant
+after a flight from Oslo to Lisbon makes the alarm ring at 06:00, and nothing
+corrects it until the app next runs — which for a traveller may be after it has
+already gone off at the wrong time.
+
+`AlarmDef` therefore also carries the wall clock (`wallHour`, `wallMinute`,
+`repeatDays`, `tzMode`), and `AlarmScheduler.rezone()` recomputes the instants on
+`TIMEZONE_CHANGED` / `TIME_SET` using `NextFire.kt`. Dart's reconcile stays
+authoritative and overwrites whatever this produced on its next run; the Kotlin
+copy only has to keep things right in the meantime. **Do not let it grow into a
+second scheduler** — two schedulers that disagree is worse than one that is
+occasionally stale.
+
+**This cannot be tested from a host machine:** `TIMEZONE_CHANGED` is a protected
+broadcast that `adb shell` may not send, so it must be exercised by actually
+changing the device's timezone in Settings and checking that a repeating alarm's
+next-fire time moves with it.
 
 ## What "done" looks like
 

@@ -17,6 +17,15 @@ class BootReceiver : BroadcastReceiver() {
         try {
             Log.i(TAG, "re-arming after ${intent.action}")
             AlarmScheduler.reconcile(context)
+
+            // A timezone or clock change moves what "07:00" means, so the stored
+            // instants have to be recomputed rather than merely re-armed.
+            if (intent.action == Intent.ACTION_TIMEZONE_CHANGED ||
+                intent.action == Intent.ACTION_TIME_CHANGED
+            ) {
+                AlarmScheduler.rezone(context)
+            }
+
             BootLog.record(context, intent.action ?: "unknown")
         } catch (t: Throwable) {
             Log.e(TAG, "re-arm FAILED after ${intent.action}", t)

@@ -14,6 +14,10 @@ class AlarmEngine {
     String soundRef = 'default',
     int snoozeMinutes = 9,
     int maxSnoozes = 3,
+    int wallHour = -1,
+    int wallMinute = -1,
+    int repeatDays = 0,
+    String tzMode = 'local',
   }) =>
       _channel.invokeMethod('arm', {
         'id': id,
@@ -24,6 +28,13 @@ class AlarmEngine {
         // policy has to travel with the alarm.
         'snoozeMinutes': snoozeMinutes,
         'maxSnoozes': maxSnoozes,
+        // And the wall clock travels too, so the native side can recompute the
+        // instant when the device changes timezone — "07:00" means seven
+        // o'clock wherever you are, which a fixed instant cannot express.
+        'wallHour': wallHour,
+        'wallMinute': wallMinute,
+        'repeatDays': repeatDays,
+        'tzMode': tzMode,
       });
 
   static Future<void> disarm(String id) =>

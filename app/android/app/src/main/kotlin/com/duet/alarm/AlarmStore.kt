@@ -43,8 +43,25 @@ data class AlarmDef(
     /** 0 disables snoozing outright. */
     val maxSnoozes: Int = 3,
     /** How many snoozes have already been used in THIS ring session. */
-    val snoozeCount: Int = 0
+    val snoozeCount: Int = 0,
+    /**
+     * The wall clock this instant was derived from, and the repeat mask.
+     *
+     * fireAtUtc alone is not enough: "07:00" means seven o'clock wherever you
+     * are, so the instant has to be recomputed when the device changes
+     * timezone. -1 means "unknown" (a snooze, or an alarm armed before this
+     * field existed), in which case the instant is left alone.
+     */
+    val wallHour: Int = -1,
+    val wallMinute: Int = -1,
+    val repeatDays: Int = 0,
+    /** 'local' follows the device; 'absolute' is a fixed moment and never moves. */
+    val tzMode: String = "local"
 ) {
+    val canRezone: Boolean
+        get() = wallHour in 0..23 && wallMinute in 0..59 &&
+            tzMode == "local" && !id.startsWith(SNOOZE_PREFIX)
+
     val snoozesLeft: Int get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
     val canSnooze: Boolean get() = snoozesLeft > 0
 
@@ -59,6 +76,10 @@ data class AlarmDef(
         put("snoozeMinutes", snoozeMinutes)
         put("maxSnoozes", maxSnoozes)
         put("snoozeCount", snoozeCount)
+        put("wallHour", wallHour)
+        put("wallMinute", wallMinute)
+        put("repeatDays", repeatDays)
+        put("tzMode", tzMode)
     }
 
     companion object {
@@ -71,7 +92,11 @@ data class AlarmDef(
             soundRef = o.optString("soundRef", "default"),
             snoozeMinutes = o.optInt("snoozeMinutes", 9),
             maxSnoozes = o.optInt("maxSnoozes", 3),
-            snoozeCount = o.optInt("snoozeCount", 0)
+            snoozeCount = o.optInt("snoozeCount", 0),
+            wallHour = o.optInt("wallHour", -1),
+            wallMinute = o.optInt("wallMinute", -1),
+            repeatDays = o.optInt("repeatDays", 0),
+            tzMode = o.optString("tzMode", "local")
         )
     }
 }

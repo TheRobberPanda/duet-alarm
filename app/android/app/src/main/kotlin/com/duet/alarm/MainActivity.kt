@@ -45,7 +45,11 @@ class MainActivity : FlutterActivity() {
                             label = call.argument<String>("label") ?: "",
                             soundRef = call.argument<String>("soundRef") ?: "default",
                             snoozeMinutes = call.argument<Number>("snoozeMinutes")?.toInt() ?: 9,
-                            maxSnoozes = call.argument<Number>("maxSnoozes")?.toInt() ?: 3
+                            maxSnoozes = call.argument<Number>("maxSnoozes")?.toInt() ?: 3,
+                            wallHour = call.argument<Number>("wallHour")?.toInt() ?: -1,
+                            wallMinute = call.argument<Number>("wallMinute")?.toInt() ?: -1,
+                            repeatDays = call.argument<Number>("repeatDays")?.toInt() ?: 0,
+                            tzMode = call.argument<String>("tzMode") ?: "local"
                         )
                         AlarmScheduler.arm(this, def)
                         result.success(null)

@@ -165,6 +165,10 @@ class AlarmRepository {
         soundRef: entry.value.alarm.soundRef,
         snoozeMinutes: entry.value.alarm.snoozeMinutes,
         maxSnoozes: entry.value.alarm.maxSnoozes,
+        wallHour: entry.value.alarm.hour,
+        wallMinute: entry.value.alarm.minute,
+        repeatDays: entry.value.alarm.repeatDays,
+        tzMode: 'local',
       );
     }
   }

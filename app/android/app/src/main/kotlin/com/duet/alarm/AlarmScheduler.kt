@@ -79,6 +79,46 @@ object AlarmScheduler {
         Log.i(TAG, "reconciled ${defs.size} alarm(s), ${missed.size} missed")
     }
 
+    /**
+     * Recomputes every wall-clock alarm for the device's CURRENT timezone.
+     *
+     * Called on TIMEZONE_CHANGED and TIME_SET. Without this, an alarm set for
+     * 07:00 in Oslo keeps its original instant and rings at 06:00 in Lisbon --
+     * and nothing corrects it until the app next runs, which for a traveller
+     * may well be after it has already gone off at the wrong time.
+     *
+     * Dart's reconcile remains authoritative and will overwrite this on the next
+     * run; this only has to keep things right in the meantime.
+     */
+    fun rezone(ctx: Context) {
+        val now = System.currentTimeMillis()
+        var moved = 0
+
+        for (def in AlarmStore.all(ctx)) {
+            if (!def.canRezone) continue
+
+            val recomputed = NextFire.next(
+                hour = def.wallHour,
+                minute = def.wallMinute,
+                repeatDays = def.repeatDays,
+                after = now
+            ) ?: continue
+
+            if (recomputed == def.fireAtUtc) continue
+
+            // The armed id encodes the old instant, so the old one must be
+            // cancelled explicitly rather than overwritten.
+            disarm(ctx, def.id)
+            val newId = def.id.substringBefore('#') + "#" + recomputed
+            arm(ctx, def.copy(id = newId, fireAtUtc = recomputed))
+            moved++
+        }
+
+        if (moved > 0) {
+            Log.i(TAG, "rezoned $moved alarm(s) to ${java.util.TimeZone.getDefault().id}")
+        }
+    }
+
     fun canScheduleExact(ctx: Context): Boolean {
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
