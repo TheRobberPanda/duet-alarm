@@ -162,6 +162,31 @@ All four components in the ring path (`AlarmReceiver`, `AlarmService`,
 `BootReceiver`, `RingingActivity`) are `directBootAware`, and all alarm state is
 in device-protected storage. Nothing in the chain depends on an unlock.
 
+### A repeating alarm must schedule its own next occurrence
+
+Dart arms a rolling 48-hour window, but only when the app runs. A Monday-only
+alarm that fired on Monday was removed as spent, and the next occurrence — seven
+days away, outside the window — was never armed. If the user did not happen to
+open the app before the following Monday, **the alarm simply never rang again**,
+and nothing reported it: it was never armed, so it could not be "missed".
+
+`AlarmService` now arms the next occurrence at the moment an alarm fires, using
+the wall clock that travels with the definition. Repeating alarms therefore
+perpetuate themselves with no app run at all.
+
+The companion change matters just as much: Dart's reconcile no longer disarms
+anything beyond its own horizon. Without that it would have deleted the
+natively-armed occurrence on the very next app launch and reintroduced the gap.
+
+Verified on device:
+
+```
+21:11:00.029  FIRED weeklytest#1788376260000   (29 ms late)
+21:11:00.295  armed weeklytest#1788981060000   (exactly 7 days later)
+```
+
+and the 7-day-out alarm then survived a force-stop and full reconcile.
+
 ### Timezone changes need recomputation, not re-arming
 
 The store holds absolute instants, because that is what `AlarmManager` takes.

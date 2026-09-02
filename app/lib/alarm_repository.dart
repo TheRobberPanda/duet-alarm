@@ -146,11 +146,20 @@ class AlarmRepository {
     // Anything armed that is no longer wanted -- an alarm edited, disabled or
     // deleted -- has to be cancelled, or it rings for a definition that no
     // longer exists.
+    final horizon = now.add(window);
     for (final a in armed) {
       // Snooze alarms belong to a live ring session, not to a definition. The
       // native side owns them; disarming one here would cancel a snooze the
       // user just asked for.
       if (a.id.startsWith('snooze:')) continue;
+
+      // Anything beyond our window was armed by the native side when a
+      // repeating alarm fired, so that a Monday-only alarm does not need the
+      // app to run before it can ring again. We cannot see those in `desired`
+      // -- they are outside the horizon by definition -- so disarming them here
+      // would silently undo that and reintroduce the very gap it closes.
+      if (a.fireAt.isAfter(horizon)) continue;
+
       if (!desired.containsKey(a.id)) {
         await AlarmEngine.disarm(a.id);
       }

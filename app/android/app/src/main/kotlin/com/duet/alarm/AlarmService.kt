@@ -47,10 +47,41 @@ class AlarmService : Service() {
         startVibration()
         RingLog.record(this, id, System.currentTimeMillis())
 
-        // One-shot alarms are spent once they fire.
+        // A repeating alarm must schedule its own next occurrence HERE, while we
+        // have the definition in hand.
+        //
+        // Dart arms a rolling 48-hour window, but only when the app runs. A
+        // Monday-only alarm that fires on Monday would otherwise sit unarmed
+        // until the user happened to open the app -- and if they did not, it
+        // would simply never ring again. Nothing would report it, either: it was
+        // never armed, so it cannot be "missed".
+        //
+        // The wall clock travels with the definition precisely so this can be
+        // computed without a Flutter engine. Dart's reconcile stays
+        // authoritative and will correct anything this gets wrong.
+        rearmNextOccurrence(def)
+
+        // The instant that just fired is spent either way.
         AlarmStore.remove(this, id)
 
         return START_STICKY
+    }
+
+    private fun rearmNextOccurrence(def: AlarmDef?) {
+        if (def == null || def.repeatDays == 0) return
+        if (def.id.startsWith(AlarmDef.SNOOZE_PREFIX)) return
+        if (def.wallHour !in 0..23 || def.wallMinute !in 0..59) return
+
+        val next = NextFire.next(
+            hour = def.wallHour,
+            minute = def.wallMinute,
+            repeatDays = def.repeatDays,
+            after = System.currentTimeMillis()
+        ) ?: return
+
+        val base = def.id.substringBefore('#')
+        AlarmScheduler.arm(this, def.copy(id = "$base#$next", fireAtUtc = next, snoozeCount = 0))
+        Log.i(TAG, "re-armed $base for next occurrence at $next")
     }
 
     private fun buildNotification(id: String, label: String, def: AlarmDef?): Notification {
