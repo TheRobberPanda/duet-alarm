@@ -35,6 +35,11 @@ class DuetApp extends StatelessWidget {
             secondary: _teal,
             surface: _surface,
           ),
+          // 'sans-serif' resolves to the DEVICE's system font (MiSans on
+          // HyperOS, Roboto on Pixel, One UI Sans on Samsung) rather than a
+          // font we ship. It looks native and costs nothing, at the price of
+          // the app looking different on every OEM. Revisit when the brand
+          // font from the design canvas (Hanken Grotesk) gets bundled.
           fontFamily: 'sans-serif',
         ),
         home: const HomePage(),
