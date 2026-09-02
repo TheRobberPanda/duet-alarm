@@ -36,21 +36,42 @@ data class AlarmDef(
     val id: String,
     val fireAtUtc: Long,
     val label: String,
-    val soundRef: String
+    val soundRef: String,
+    /** Minutes a snooze lasts. Carried here because the ringing screen has no
+     *  Flutter engine to ask -- it must decide entirely from local state. */
+    val snoozeMinutes: Int = 9,
+    /** 0 disables snoozing outright. */
+    val maxSnoozes: Int = 3,
+    /** How many snoozes have already been used in THIS ring session. */
+    val snoozeCount: Int = 0
 ) {
+    val snoozesLeft: Int get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
+    val canSnooze: Boolean get() = snoozesLeft > 0
+
+    /** The user-facing alarm this belongs to, stripping any snooze wrapper. */
+    val baseId: String get() = id.removePrefix(SNOOZE_PREFIX)
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
         put("fireAtUtc", fireAtUtc)
         put("label", label)
         put("soundRef", soundRef)
+        put("snoozeMinutes", snoozeMinutes)
+        put("maxSnoozes", maxSnoozes)
+        put("snoozeCount", snoozeCount)
     }
 
     companion object {
+        const val SNOOZE_PREFIX = "snooze:"
+
         fun fromJson(o: JSONObject) = AlarmDef(
             id = o.getString("id"),
             fireAtUtc = o.getLong("fireAtUtc"),
             label = o.optString("label", ""),
-            soundRef = o.optString("soundRef", "default")
+            soundRef = o.optString("soundRef", "default"),
+            snoozeMinutes = o.optInt("snoozeMinutes", 9),
+            maxSnoozes = o.optInt("maxSnoozes", 3),
+            snoozeCount = o.optInt("snoozeCount", 0)
         )
     }
 }

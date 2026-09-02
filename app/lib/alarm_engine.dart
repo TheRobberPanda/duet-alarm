@@ -12,12 +12,18 @@ class AlarmEngine {
     required DateTime fireAt,
     String label = '',
     String soundRef = 'default',
+    int snoozeMinutes = 9,
+    int maxSnoozes = 3,
   }) =>
       _channel.invokeMethod('arm', {
         'id': id,
         'fireAtUtc': fireAt.millisecondsSinceEpoch,
         'label': label,
         'soundRef': soundRef,
+        // The ringing screen has no Flutter engine to consult, so the snooze
+        // policy has to travel with the alarm.
+        'snoozeMinutes': snoozeMinutes,
+        'maxSnoozes': maxSnoozes,
       });
 
   static Future<void> disarm(String id) =>

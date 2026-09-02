@@ -147,8 +147,10 @@ class AlarmRepository {
     // deleted -- has to be cancelled, or it rings for a definition that no
     // longer exists.
     for (final a in armed) {
-      // Snooze alarms are created by the native side and are not ours to manage.
-      if (a.id.endsWith('-snooze')) continue;
+      // Snooze alarms belong to a live ring session, not to a definition. The
+      // native side owns them; disarming one here would cancel a snooze the
+      // user just asked for.
+      if (a.id.startsWith('snooze:')) continue;
       if (!desired.containsKey(a.id)) {
         await AlarmEngine.disarm(a.id);
       }
@@ -161,6 +163,8 @@ class AlarmRepository {
         fireAt: entry.value.at,
         label: entry.value.alarm.label,
         soundRef: entry.value.alarm.soundRef,
+        snoozeMinutes: entry.value.alarm.snoozeMinutes,
+        maxSnoozes: entry.value.alarm.maxSnoozes,
       );
     }
   }

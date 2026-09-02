@@ -40,7 +40,7 @@ class AlarmService : Service() {
 
         // Must happen within a few seconds of the service starting or the system
         // kills us for not posting a foreground notification.
-        startForeground(NOTIF_ID, buildNotification(id, label))
+        startForeground(NOTIF_ID, buildNotification(id, label, def))
 
         acquireWakeLock()
         startAudio(def?.soundRef ?: "default")
@@ -53,7 +53,7 @@ class AlarmService : Service() {
         return START_STICKY
     }
 
-    private fun buildNotification(id: String, label: String): Notification {
+    private fun buildNotification(id: String, label: String, def: AlarmDef?): Notification {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -75,7 +75,15 @@ class AlarmService : Service() {
         val fullScreen = PendingIntent.getActivity(
             this, 1,
             Intent(this, RingingActivity::class.java).apply {
+                // The whole definition rides on the intent: the service deletes
+                // the stored alarm once it fires (a one-shot is spent), so the
+                // ringing screen cannot look it up afterwards.
                 putExtra(AlarmReceiver.EXTRA_ALARM_ID, id)
+                putExtra("label", label)
+                putExtra("soundRef", def?.soundRef ?: "default")
+                putExtra("snoozeMinutes", def?.snoozeMinutes ?: 9)
+                putExtra("maxSnoozes", def?.maxSnoozes ?: 3)
+                putExtra("snoozeCount", def?.snoozeCount ?: 0)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

@@ -3,7 +3,10 @@ package com.duet.alarm
 import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -14,6 +17,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.text.SimpleDateFormat
@@ -25,21 +29,33 @@ import java.util.*
  * Cold-starting the Flutter engine from a locked screen at 06:00 adds latency and
  * a class of failure that cannot be debugged from bed -- on the one screen that
  * absolutely must work. This is plain Android views with no dependencies, so it
- * keeps working even if the Flutter side is broken entirely.
+ * keeps working even if the Flutter side is broken entirely, and it can run
+ * before first unlock (directBootAware) after an overnight reboot.
  * See docs/12-roadblocks.md section 3.2.
  */
 class RingingActivity : Activity() {
 
     private var alarmId: String? = null
+    private var snoozeMinutes = 9
+    private var maxSnoozes = 3
+    private var snoozeCount = 0
+    private var soundRef = "default"
+    private var label = "Alarm"
+
+    private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showOverLockScreen()
 
         alarmId = intent.getStringExtra(AlarmReceiver.EXTRA_ALARM_ID)
-        val label = intent.getStringExtra("label") ?: "Alarm"
+        label = intent.getStringExtra("label")?.takeIf { it.isNotBlank() } ?: "Alarm"
+        soundRef = intent.getStringExtra("soundRef") ?: "default"
+        snoozeMinutes = intent.getIntExtra("snoozeMinutes", 9)
+        maxSnoozes = intent.getIntExtra("maxSnoozes", 3)
+        snoozeCount = intent.getIntExtra("snoozeCount", 0)
 
-        setContentView(buildUi(label))
+        setContentView(buildUi())
     }
 
     private fun showOverLockScreen() {
@@ -61,65 +77,92 @@ class RingingActivity : Activity() {
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
-    private fun buildUi(label: String): View {
+    private fun buildUi(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(Color.parseColor("#141110"))
-            setPadding(dp(24), dp(48), dp(24), dp(32))
+            setPadding(dp(24), dp(40), dp(24), dp(28))
         }
 
-        root.addView(TextView(this).apply {
+        // ── The dial: two-tone ring with the time inside ──────────────────────
+        // Amber is your partner, teal is you. Even alone, the ring is the app's
+        // signature mark and the thing that says "this is Duet, not a stock
+        // alarm" to someone squinting at 06:00.
+        val dial = FrameLayout(this)
+        dial.addView(
+            PairRingView(this),
+            FrameLayout.LayoutParams(dp(268), dp(268), Gravity.CENTER)
+        )
+
+        val inner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+        inner.addView(TextView(this).apply {
             text = label.uppercase()
             setTextColor(Color.parseColor("#A08C7C"))
-            textSize = 13f
+            textSize = 12f
             letterSpacing = 0.22f
             gravity = Gravity.CENTER
         })
-
-        val clock = TextView(this).apply {
+        inner.addView(TextView(this).apply {
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             setTextColor(Color.parseColor("#FBF5EF"))
-            textSize = 82f
+            textSize = 62f
             typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            letterSpacing = 0.04f
+            letterSpacing = 0.03f
             gravity = Gravity.CENTER
-        }
-        root.addView(clock, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-            topMargin = dp(16)
+        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+            topMargin = dp(6)
         })
-
-        root.addView(TextView(this).apply {
+        inner.addView(TextView(this).apply {
             text = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
             setTextColor(Color.parseColor("#8A7C72"))
-            textSize = 15f
+            textSize = 13f
             gravity = Gravity.CENTER
         })
+        dial.addView(
+            inner,
+            FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER)
+        )
 
-        // Spacer pushes the controls to the bottom of the screen.
+        root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
+        root.addView(dial, LinearLayout.LayoutParams(dp(268), dp(268)))
         root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
 
-        // Primary row: these stop YOUR phone only. In Milestone 0 there is no
-        // partner yet, but the hierarchy is built in from the start so the
-        // "for both" actions are never the easy mis-tap. See docs/01-product-spec.md.
-        val primary = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        // ── Controls ─────────────────────────────────────────────────────────
+        // These stop YOUR phone only. The "for both of us" variants belong here
+        // too (docs/01), deliberately smaller and behind a long press -- but they
+        // are omitted until pairing exists rather than shipped as dead buttons.
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
-        primary.addView(
-            actionButton("Snooze", "#241D18", "#F5EDE6", outlined = true) { snooze() },
-            LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; rightMargin = dp(6) }
-        )
-        primary.addView(
+        if (snoozesLeft > 0) {
+            controls.addView(
+                actionButton("Snooze", "#241D18", "#F5EDE6", outlined = true) { snooze() },
+                LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; rightMargin = dp(6) }
+            )
+        }
+        controls.addView(
             actionButton("Dismiss", "#E9A35B", "#1B120A", outlined = false) { dismiss() },
-            LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; leftMargin = dp(6) }
+            LinearLayout.LayoutParams(0, dp(72)).apply {
+                weight = 1f
+                if (snoozesLeft > 0) leftMargin = dp(6)
+            }
         )
-        root.addView(primary, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(controls, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         root.addView(TextView(this).apply {
-            text = "Stops your phone only"
+            text = when {
+                maxSnoozes == 0 -> "Snooze is off for this alarm"
+                snoozesLeft == 0 -> "No snoozes left — time to get up"
+                snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
+                else -> "Snooze lasts $snoozeMinutes min"
+            }
             setTextColor(Color.parseColor("#6E625B"))
             textSize = 13f
             gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
+            setPadding(0, dp(14), 0, 0)
         })
 
         return root
@@ -144,17 +187,35 @@ class RingingActivity : Activity() {
     private fun snooze() {
         val id = alarmId ?: return finishRinging()
         AlarmService.stop(this, id)
-        // Milestone 0 keeps this simple: a fresh one-shot 9 minutes out.
-        val next = System.currentTimeMillis() + 9 * 60 * 1000L
+
+        if (snoozesLeft <= 0) return finishRinging()
+
+        // Re-arm under a stable snooze id derived from the original alarm, so a
+        // second snooze replaces the first rather than stacking. The Dart
+        // reconcile loop skips these -- they belong to the ring session, not to
+        // the user's alarm definitions.
+        val base = id.removePrefix(AlarmDef.SNOOZE_PREFIX)
         AlarmScheduler.arm(
             this,
-            AlarmDef(id = "$id-snooze", fireAtUtc = next, label = "Snoozed", soundRef = "default")
+            AlarmDef(
+                id = AlarmDef.SNOOZE_PREFIX + base,
+                fireAtUtc = System.currentTimeMillis() + snoozeMinutes * 60_000L,
+                label = label,
+                soundRef = soundRef,
+                snoozeMinutes = snoozeMinutes,
+                maxSnoozes = maxSnoozes,
+                snoozeCount = snoozeCount + 1
+            )
         )
         finishRinging()
     }
 
     private fun dismiss() {
-        alarmId?.let { AlarmService.stop(this, it) }
+        alarmId?.let {
+            AlarmService.stop(this, it)
+            // A dismiss ends the whole session, including any pending snooze.
+            AlarmScheduler.disarm(this, AlarmDef.SNOOZE_PREFIX + it.removePrefix(AlarmDef.SNOOZE_PREFIX))
+        }
         finishRinging()
     }
 
@@ -166,4 +227,39 @@ class RingingActivity : Activity() {
 
     /** Back must not silently kill the alarm. */
     override fun onBackPressed() { /* intentionally ignored */ }
+}
+
+/**
+ * The two-tone ring, drawn rather than bundled so it scales to any density and
+ * needs no asset. Right half teal (you), left half amber (them).
+ */
+private class PairRingView(context: Context) : View(context) {
+    private val track = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.parseColor("#2A231E")
+    }
+    private val you = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.parseColor("#5FB3AE")
+    }
+    private val them = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.parseColor("#E9A35B")
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val stroke = width * 0.011f
+        track.strokeWidth = stroke
+        you.strokeWidth = stroke * 1.6f
+        them.strokeWidth = stroke * 1.6f
+
+        val pad = stroke * 2f
+        val rect = RectF(pad, pad, width - pad, height - pad)
+
+        canvas.drawArc(rect, 0f, 360f, false, track)
+        canvas.drawArc(rect, -90f, 180f, false, you)
+        canvas.drawArc(rect, 90f, 180f, false, them)
+    }
 }

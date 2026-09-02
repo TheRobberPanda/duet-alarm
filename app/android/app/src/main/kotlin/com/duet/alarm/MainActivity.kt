@@ -43,7 +43,9 @@ class MainActivity : FlutterActivity() {
                             id = call.argument<String>("id")!!,
                             fireAtUtc = call.argument<Number>("fireAtUtc")!!.toLong(),
                             label = call.argument<String>("label") ?: "",
-                            soundRef = call.argument<String>("soundRef") ?: "default"
+                            soundRef = call.argument<String>("soundRef") ?: "default",
+                            snoozeMinutes = call.argument<Number>("snoozeMinutes")?.toInt() ?: 9,
+                            maxSnoozes = call.argument<Number>("maxSnoozes")?.toInt() ?: 3
                         )
                         AlarmScheduler.arm(this, def)
                         result.success(null)
@@ -63,7 +65,10 @@ class MainActivity : FlutterActivity() {
                                 "id" to it.id,
                                 "fireAtUtc" to it.fireAtUtc,
                                 "label" to it.label,
-                                "soundRef" to it.soundRef
+                                "soundRef" to it.soundRef,
+                                "snoozeMinutes" to it.snoozeMinutes,
+                                "maxSnoozes" to it.maxSnoozes,
+                                "snoozeCount" to it.snoozeCount
                             )
                         }
                     )
