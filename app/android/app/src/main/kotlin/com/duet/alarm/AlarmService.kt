@@ -124,7 +124,28 @@ class AlarmService : Service() {
             Notification.Builder(this, CHANNEL_ID) else
             @Suppress("DEPRECATION") Notification.Builder(this)
 
-        return builder
+        // Actions matter most when the phone is already in use: Android
+        // suppresses the full-screen intent then and shows a heads-up instead,
+        // so without these the only way to stop the alarm is to tap through to
+        // the ringing screen first.
+        fun action(act: String, extra: Int) = PendingIntent.getBroadcast(
+            this, extra,
+            Intent(this, AlarmActionReceiver::class.java).apply {
+                action = act
+                setPackage(packageName)
+                putExtra(AlarmReceiver.EXTRA_ALARM_ID, id)
+                putExtra("label", label)
+                putExtra("soundRef", def?.soundRef ?: "default")
+                putExtra("snoozeMinutes", def?.snoozeMinutes ?: 9)
+                putExtra("maxSnoozes", def?.maxSnoozes ?: 3)
+                putExtra("snoozeCount", def?.snoozeCount ?: 0)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val snoozesLeft = (def?.maxSnoozes ?: 3) - (def?.snoozeCount ?: 0)
+
+        builder
             .setContentTitle(label)
             .setContentText("Alarm ringing")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -134,7 +155,21 @@ class AlarmService : Service() {
             // The heads-up path when the screen is on; the launch path when locked.
             .setFullScreenIntent(fullScreen, true)
             .setContentIntent(fullScreen)
-            .build()
+
+        if (snoozesLeft > 0) {
+            builder.addAction(
+                Notification.Action.Builder(
+                    null, "Snooze", action(AlarmActionReceiver.ACTION_SNOOZE, 10)
+                ).build()
+            )
+        }
+        builder.addAction(
+            Notification.Action.Builder(
+                null, "Dismiss", action(AlarmActionReceiver.ACTION_DISMISS, 11)
+            ).build()
+        )
+
+        return builder.build()
     }
 
     private fun acquireWakeLock() {

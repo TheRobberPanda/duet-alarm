@@ -77,6 +77,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Snooze / Dismiss straight from the notification. -->
+        <receiver
+            android:name=".AlarmActionReceiver"
+            android:exported="false"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="com.duet.alarm.action.SNOOZE" />
+                <action android:name="com.duet.alarm.action.DISMISS" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true"

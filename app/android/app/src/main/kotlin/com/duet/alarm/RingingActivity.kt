@@ -2,7 +2,11 @@ package com.duet.alarm
 
 import android.app.Activity
 import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -56,6 +60,21 @@ class RingingActivity : Activity() {
         snoozeCount = intent.getIntExtra("snoozeCount", 0)
 
         setContentView(buildUi())
+
+        // If the user acts on the notification instead, this screen must go too.
+        ContextCompat.registerReceiver(
+            this, ringEnded, IntentFilter(AlarmActions.ACTION_RING_ENDED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
+
+    private val ringEnded = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) = finishRinging()
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(ringEnded) }
+        super.onDestroy()
     }
 
     private fun showOverLockScreen() {
@@ -184,38 +203,25 @@ class RingingActivity : Activity() {
         setOnClickListener { onClick() }
     }
 
+    // Both actions live in AlarmActions so this screen and the notification
+    // cannot drift apart. A dismiss that only half-worked from one of them
+    // would be a very bad bug.
     private fun snooze() {
         val id = alarmId ?: return finishRinging()
-        AlarmService.stop(this, id)
-
-        if (snoozesLeft <= 0) return finishRinging()
-
-        // Re-arm under a stable snooze id derived from the original alarm, so a
-        // second snooze replaces the first rather than stacking. The Dart
-        // reconcile loop skips these -- they belong to the ring session, not to
-        // the user's alarm definitions.
-        val base = id.removePrefix(AlarmDef.SNOOZE_PREFIX)
-        AlarmScheduler.arm(
-            this,
-            AlarmDef(
-                id = AlarmDef.SNOOZE_PREFIX + base,
-                fireAtUtc = System.currentTimeMillis() + snoozeMinutes * 60_000L,
-                label = label,
-                soundRef = soundRef,
-                snoozeMinutes = snoozeMinutes,
-                maxSnoozes = maxSnoozes,
-                snoozeCount = snoozeCount + 1
-            )
+        AlarmActions.snooze(
+            ctx = this,
+            alarmId = id,
+            label = label,
+            soundRef = soundRef,
+            snoozeMinutes = snoozeMinutes,
+            maxSnoozes = maxSnoozes,
+            snoozeCount = snoozeCount
         )
         finishRinging()
     }
 
     private fun dismiss() {
-        alarmId?.let {
-            AlarmService.stop(this, it)
-            // A dismiss ends the whole session, including any pending snooze.
-            AlarmScheduler.disarm(this, AlarmDef.SNOOZE_PREFIX + it.removePrefix(AlarmDef.SNOOZE_PREFIX))
-        }
+        alarmId?.let { AlarmActions.dismiss(this, it) }
         finishRinging()
     }
 

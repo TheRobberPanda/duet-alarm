@@ -115,7 +115,7 @@ Each of these on the real Redmi, screen off, phone locked. Tick them off honestl
 | 8 | Rings with Battery Saver on | |
 | 9 | Survives a reboot — arm, restart the phone, do not open the app | ✅ 1.45 s late, fired *before* first unlock |
 | 10 | Survives an app update — arm, `flutter run` again, do not reopen | ✅ MY_PACKAGE_REPLACED re-arms |
-| 11 | Snooze re-rings 9 minutes later | |
+| 11 | Snooze re-rings after the configured delay | ✅ incl. allowance boundary |
 | 12 | Two alarms one minute apart both ring | |
 | 13 | Timezone change re-arms correctly | ⚠ code in place, **needs a real device timezone change** |
 | 14 | **Overnight, offline, in a drawer, from 23:00 to 06:40** | |
@@ -161,6 +161,26 @@ reboot case is genuinely covered, not covered by luck.
 All four components in the ring path (`AlarmReceiver`, `AlarmService`,
 `BootReceiver`, `RingingActivity`) are `directBootAware`, and all alarm state is
 in device-protected storage. Nothing in the chain depends on an unlock.
+
+### An unlocked phone gets a notification, not the full-screen screen
+
+Android only launches a full-screen intent when the screen is off or locked.
+With the phone unlocked and in use it shows a heads-up notification instead —
+correct platform behaviour, but our notification had no actions, so the only way
+to stop the alarm was to tap through to the ringing screen first.
+
+Snooze and Dismiss are now notification actions, sharing `AlarmActions` with the
+ringing screen so the two cannot drift apart. Acting from either closes the
+other via an internal `RING_ENDED` broadcast.
+
+Verified on device, with a 1-minute snooze and an allowance of 2:
+
+```
+21:21:10  snoozed notiftest for 1 min (1/2)
+21:22:13  snoozed snooze:notiftest for 1 min (2/2)
+3rd ring  actions=1, [0] "Dismiss"     — Snooze correctly withdrawn
+21:23:32  dismissed snooze:notiftest
+```
 
 ### A repeating alarm must schedule its own next occurrence
 
