@@ -105,16 +105,16 @@ Each of these on the real Redmi, screen off, phone locked. Tick them off honestl
 
 | # | Test | Pass? |
 |---|---|---|
-| 1 | Rings 30 seconds out with the app open | |
-| 2 | Rings 2 minutes out with the phone locked, face down | |
-| 3 | Ringing screen appears **over** the lock screen | |
+| 1 | Rings 30 seconds out with the app open | ✅ 12 ms late |
+| 2 | Rings 2 minutes out with the phone locked, face down | ✅ |
+| 3 | Ringing screen appears **over** the lock screen | ✅ normal boot |
 | 4 | Audio plays with media volume at zero (alarm stream) | |
 | 5 | Audio plays with Do Not Disturb on | |
 | 6 | Rings after 8 hours idle in a drawer (Doze) | |
 | 7 | Rings with airplane mode on | |
 | 8 | Rings with Battery Saver on | |
-| 9 | Survives a reboot — arm, restart the phone, do not open the app | |
-| 10 | Survives an app update — arm, `flutter run` again, do not reopen | |
+| 9 | Survives a reboot — arm, restart the phone, do not open the app | ✅ 1.45 s late, fired *before* first unlock |
+| 10 | Survives an app update — arm, `flutter run` again, do not reopen | ✅ MY_PACKAGE_REPLACED re-arms |
 | 11 | Snooze re-rings 9 minutes later | |
 | 12 | Two alarms one minute apart both ring | |
 | 13 | Timezone change re-arms correctly | |
@@ -122,7 +122,28 @@ Each of these on the real Redmi, screen off, phone locked. Tick them off honestl
 
 Test 14 is the milestone. The rest are the ways it fails.
 
-Test 9 is the one that will fail first, and Autostart is why.
+### What the first reboot test actually taught us
+
+Test 9 did fail first — but Autostart was not the reason, and the guess was
+wrong. Two real defects surfaced instead:
+
+1. Alarm state was in credential-encrypted storage, so the boot receiver threw
+   `IllegalStateException` at `LOCKED_BOOT_COMPLETED` and no alarm was re-armed.
+   Alarm state now lives in **device-protected storage**. For an alarm clock this
+   is the correct design, not a workaround: a phone that reboots at 03:00 stays
+   at the lock screen until someone unlocks it, so the alarm has to be readable
+   before first unlock in order to ring at all.
+
+2. MIUI delivered `BOOT_COMPLETED` **three and a half minutes** after boot. By
+   then the alarm was overdue, and `prune()` deleted it silently while logging a
+   cheerful "reconciled 0 alarm(s)". Overdue alarms are now recorded to
+   `MissedLog`, logged at warn, and shown in the app.
+
+After the fix the alarm re-armed during direct boot and fired 1.45 s late,
+*before* `BOOT_COMPLETED` arrived — i.e. before first unlock.
+
+**Still open:** `RingingActivity` is not direct-boot aware, so it is unverified
+whether the full-screen ringing UI appears pre-unlock, or only the audio plays.
 
 ## What "done" looks like
 
