@@ -18,6 +18,10 @@ class AlarmEngine {
     int wallMinute = -1,
     int repeatDays = 0,
     String tzMode = 'local',
+    // Null while solo. Travels with the alarm so a firing alarm knows, with no
+    // Flutter engine to ask, whether it is worth reporting a ring session at
+    // all -- see RingSync.kt.
+    String? pairId,
   }) =>
       _channel.invokeMethod('arm', {
         'id': id,
@@ -35,6 +39,15 @@ class AlarmEngine {
         'wallMinute': wallMinute,
         'repeatDays': repeatDays,
         'tzMode': tzMode,
+        'pairId': pairId,
+      });
+
+  /// Lets a firing alarm report a ring session as the signed-in user, with no
+  /// Flutter engine running. Call with nulls on sign-out.
+  static Future<void> setAuthToken(String? accessToken, String? userId) =>
+      _channel.invokeMethod('setAuthToken', {
+        'accessToken': accessToken,
+        'userId': userId,
       });
 
   static Future<void> disarm(String id) =>

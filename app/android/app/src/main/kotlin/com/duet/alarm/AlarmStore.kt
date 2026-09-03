@@ -56,7 +56,11 @@ data class AlarmDef(
     val wallMinute: Int = -1,
     val repeatDays: Int = 0,
     /** 'local' follows the device; 'absolute' is a fixed moment and never moves. */
-    val tzMode: String = "local"
+    val tzMode: String = "local",
+    /** Null while solo. Carried here so a firing alarm knows, without asking
+     *  Dart, whether it is worth reporting a ring session at all -- see
+     *  RingSync.kt. */
+    val pairId: String? = null
 ) {
     val canRezone: Boolean
         get() = wallHour in 0..23 && wallMinute in 0..59 &&
@@ -80,6 +84,7 @@ data class AlarmDef(
         put("wallMinute", wallMinute)
         put("repeatDays", repeatDays)
         put("tzMode", tzMode)
+        put("pairId", pairId ?: JSONObject.NULL)
     }
 
     companion object {
@@ -96,9 +101,23 @@ data class AlarmDef(
             wallHour = o.optInt("wallHour", -1),
             wallMinute = o.optInt("wallMinute", -1),
             repeatDays = o.optInt("repeatDays", 0),
-            tzMode = o.optString("tzMode", "local")
+            tzMode = o.optString("tzMode", "local"),
+            pairId = if (o.isNull("pairId")) null else o.optString("pairId", null)
         )
     }
+}
+
+/**
+ * A fired id is always `<alarm-uuid>#<fire-epoch-millis>` (see
+ * AlarmRepository.reconcile in Dart, and rearmNextOccurrence above) -- pulling
+ * the two apart is how RingSync.kt derives a ring session's identity without a
+ * separate field to keep in sync.
+ */
+internal fun splitFireId(id: String): Pair<String, Long>? {
+    val i = id.lastIndexOf('#')
+    if (i < 0) return null
+    val millis = id.substring(i + 1).toLongOrNull() ?: return null
+    return id.substring(0, i) to millis
 }
 
 object AlarmStore {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'alarm_engine.dart';
 import 'alarm_repository.dart';
 import 'alarm_sync.dart';
 import 'home_screen.dart';
@@ -32,6 +33,24 @@ Future<void> main() async {
       url: SupabaseConfig.url,
       publishableKey: SupabaseConfig.publishableKey,
     );
+
+    // A firing alarm needs the token to report a ring session with no Flutter
+    // engine running (RingSync.kt), so it has to be pushed down natively
+    // rather than fetched on demand. Every auth change is a chance to refresh
+    // it -- including the token refresh Supabase does quietly on its own,
+    // which is exactly the moment a stale native copy would otherwise go
+    // uncorrected.
+    final client = Supabase.instance.client;
+    AlarmEngine.setAuthToken(
+      client.auth.currentSession?.accessToken,
+      client.auth.currentUser?.id,
+    );
+    client.auth.onAuthStateChange.listen((state) {
+      AlarmEngine.setAuthToken(
+        state.session?.accessToken,
+        state.session?.user.id,
+      );
+    });
   }
 
   runApp(const DuetApp());

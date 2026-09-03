@@ -197,7 +197,6 @@ class AlarmRepository {
     }
 
     final armed = await AlarmEngine.armedAlarms();
-    final armedIds = armed.map((a) => a.id).toSet();
 
     // Anything armed that is no longer wanted -- an alarm edited, disabled or
     // deleted -- has to be cancelled, or it rings for a definition that no
@@ -221,8 +220,13 @@ class AlarmRepository {
       }
     }
 
+    // Always re-armed, never skipped just because the id is already armed:
+    // arm() is idempotent (AlarmManager.setAlarmClock with FLAG_UPDATE_CURRENT
+    // replaces in place), and the id alone does not capture the definition --
+    // a field-only change with the same fire instant, like pairId getting
+    // stamped once pairing completes, used to reach native as nothing at all
+    // because the id it would arm under was already present in `armed`.
     for (final entry in desired.entries) {
-      if (armedIds.contains(entry.key)) continue;
       await AlarmEngine.arm(
         id: entry.key,
         fireAt: entry.value.at,
@@ -234,6 +238,7 @@ class AlarmRepository {
         wallMinute: entry.value.alarm.minute,
         repeatDays: entry.value.alarm.repeatDays,
         tzMode: 'local',
+        pairId: entry.value.alarm.pairId,
       );
     }
   }

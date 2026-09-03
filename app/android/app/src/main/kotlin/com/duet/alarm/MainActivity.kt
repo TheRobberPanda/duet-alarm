@@ -49,7 +49,8 @@ class MainActivity : FlutterActivity() {
                             wallHour = call.argument<Number>("wallHour")?.toInt() ?: -1,
                             wallMinute = call.argument<Number>("wallMinute")?.toInt() ?: -1,
                             repeatDays = call.argument<Number>("repeatDays")?.toInt() ?: 0,
-                            tzMode = call.argument<String>("tzMode") ?: "local"
+                            tzMode = call.argument<String>("tzMode") ?: "local",
+                            pairId = call.argument<String>("pairId")
                         )
                         AlarmScheduler.arm(this, def)
                         result.success(null)
@@ -93,6 +94,18 @@ class MainActivity : FlutterActivity() {
                     "openSetting" -> result.success(
                         PermissionChecks.openSetting(this, call.argument<String>("which")!!)
                     )
+
+                    // Lets a firing alarm report a ring session for the partner to see
+                    // (RingSync.kt) without a Flutter engine running. Cleared (both
+                    // null) on sign-out so a stale token never outlives the session.
+                    "setAuthToken" -> {
+                        AuthStore.set(
+                            this,
+                            call.argument<String>("accessToken"),
+                            call.argument<String>("userId")
+                        )
+                        result.success(null)
+                    }
 
                     else -> result.notImplemented()
                 }

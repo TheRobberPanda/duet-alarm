@@ -46,6 +46,7 @@ class AlarmService : Service() {
         startAudio(def?.soundRef ?: "default")
         startVibration()
         RingLog.record(this, id, System.currentTimeMillis())
+        reportRinging(def)
 
         // A repeating alarm must schedule its own next occurrence HERE, while we
         // have the definition in hand.
@@ -65,6 +66,13 @@ class AlarmService : Service() {
         AlarmStore.remove(this, id)
 
         return START_STICKY
+    }
+
+    /** Only a shared alarm (pairId set) is worth reporting -- see RingSync.kt. */
+    private fun reportRinging(def: AlarmDef?) {
+        if (def == null) return
+        val (alarmId, firedAt) = splitFireId(def.baseId) ?: return
+        RingSync.startRinging(this, alarmId, firedAt, def.pairId)
     }
 
     private fun rearmNextOccurrence(def: AlarmDef?) {
@@ -115,6 +123,7 @@ class AlarmService : Service() {
                 putExtra("snoozeMinutes", def?.snoozeMinutes ?: 9)
                 putExtra("maxSnoozes", def?.maxSnoozes ?: 3)
                 putExtra("snoozeCount", def?.snoozeCount ?: 0)
+                putExtra("pairId", def?.pairId)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -139,6 +148,7 @@ class AlarmService : Service() {
                 putExtra("snoozeMinutes", def?.snoozeMinutes ?: 9)
                 putExtra("maxSnoozes", def?.maxSnoozes ?: 3)
                 putExtra("snoozeCount", def?.snoozeCount ?: 0)
+                putExtra("pairId", def?.pairId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

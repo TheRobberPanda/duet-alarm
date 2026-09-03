@@ -29,7 +29,8 @@ object AlarmActions {
         soundRef: String,
         snoozeMinutes: Int,
         maxSnoozes: Int,
-        snoozeCount: Int
+        snoozeCount: Int,
+        pairId: String? = null
     ) {
         AlarmService.stop(ctx, alarmId)
 
@@ -51,22 +52,30 @@ object AlarmActions {
                 soundRef = soundRef,
                 snoozeMinutes = snoozeMinutes,
                 maxSnoozes = maxSnoozes,
-                snoozeCount = snoozeCount + 1
+                snoozeCount = snoozeCount + 1,
+                pairId = pairId
             )
         )
         Log.i(TAG, "snoozed $alarmId for $snoozeMinutes min (${snoozeCount + 1}/$maxSnoozes)")
+        reportState(ctx, base, "snoozed", pairId)
         endRing(ctx)
     }
 
-    fun dismiss(ctx: Context, alarmId: String) {
+    fun dismiss(ctx: Context, alarmId: String, pairId: String? = null) {
         AlarmService.stop(ctx, alarmId)
         // A dismiss ends the session, so any pending snooze goes with it.
-        AlarmScheduler.disarm(
-            ctx,
-            AlarmDef.SNOOZE_PREFIX + alarmId.removePrefix(AlarmDef.SNOOZE_PREFIX)
-        )
+        val base = alarmId.removePrefix(AlarmDef.SNOOZE_PREFIX)
+        AlarmScheduler.disarm(ctx, AlarmDef.SNOOZE_PREFIX + base)
         Log.i(TAG, "dismissed $alarmId")
+        reportState(ctx, base, "dismissed", pairId)
         endRing(ctx)
+    }
+
+    /** The fired-instant id, not a snooze-wrapped one -- a snooze is part of the
+     *  same ring session, not a new one, so it must resolve to the same id. */
+    private fun reportState(ctx: Context, baseFireId: String, state: String, pairId: String?) {
+        val (alarmId, firedAt) = splitFireId(baseFireId) ?: return
+        RingSync.updateState(ctx, alarmId, firedAt, pairId, state)
     }
 
     private fun endRing(ctx: Context) =
@@ -86,6 +95,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(AlarmReceiver.EXTRA_ALARM_ID) ?: return
 
+        val pairId = intent.getStringExtra("pairId")
         when (intent.action) {
             ACTION_SNOOZE -> AlarmActions.snooze(
                 ctx = context,
@@ -94,9 +104,10 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 soundRef = intent.getStringExtra("soundRef") ?: "default",
                 snoozeMinutes = intent.getIntExtra("snoozeMinutes", 9),
                 maxSnoozes = intent.getIntExtra("maxSnoozes", 3),
-                snoozeCount = intent.getIntExtra("snoozeCount", 0)
+                snoozeCount = intent.getIntExtra("snoozeCount", 0),
+                pairId = pairId
             )
-            ACTION_DISMISS -> AlarmActions.dismiss(context, id)
+            ACTION_DISMISS -> AlarmActions.dismiss(context, id, pairId)
         }
     }
 

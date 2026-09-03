@@ -45,6 +45,7 @@ class RingingActivity : Activity() {
     private var snoozeCount = 0
     private var soundRef = "default"
     private var label = "Alarm"
+    private var pairId: String? = null
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
 
@@ -58,6 +59,7 @@ class RingingActivity : Activity() {
         snoozeMinutes = intent.getIntExtra("snoozeMinutes", 9)
         maxSnoozes = intent.getIntExtra("maxSnoozes", 3)
         snoozeCount = intent.getIntExtra("snoozeCount", 0)
+        pairId = intent.getStringExtra("pairId")
 
         setContentView(buildUi())
 
@@ -215,13 +217,14 @@ class RingingActivity : Activity() {
             soundRef = soundRef,
             snoozeMinutes = snoozeMinutes,
             maxSnoozes = maxSnoozes,
-            snoozeCount = snoozeCount
+            snoozeCount = snoozeCount,
+            pairId = pairId
         )
         finishRinging()
     }
 
     private fun dismiss() {
-        alarmId?.let { AlarmActions.dismiss(this, it) }
+        alarmId?.let { AlarmActions.dismiss(this, it, pairId) }
         finishRinging()
     }
 

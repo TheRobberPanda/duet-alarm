@@ -69,13 +69,20 @@ class AlarmSync {
 
       // Stamp the pair onto anything created while solo, so the partner can see
       // it the moment pairing completes.
+      //
+      // A brand-new alarm is already queued in toPush (unstamped) by the loop
+      // above, so finding it there is not enough to skip it -- that unstamped
+      // copy is exactly the stale one that must not reach the server. It has
+      // to be replaced, or the push silently ships an alarm with no pair_id
+      // even though the local state (and the UI reading it) already show one.
       if (pairId != null) {
         for (final id in merged.keys.toList()) {
           final a = merged[id]!;
           if (a.pairId == null) {
             final stamped = a.copyWith(pairId: pairId);
             merged[id] = stamped;
-            if (!toPush.any((p) => p.id == id)) toPush.add(stamped);
+            toPush.removeWhere((p) => p.id == id);
+            toPush.add(stamped);
           }
         }
       }
