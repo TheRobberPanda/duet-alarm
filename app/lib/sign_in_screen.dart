@@ -93,12 +93,19 @@ class _SignInScreenState extends State<SignInScreen> {
                   controller: _code,
                   keyboardType: TextInputType.number,
                   autofocus: true,
-                  maxLength: 6,
+                  // NOT hard-coded to six. Supabase's email OTP length is a
+                  // server setting (6-10), and a client constant that has to
+                  // match it is a silent breakage waiting to happen -- exactly
+                  // what bit us: the code arrived longer than the field allowed
+                  // and could not be typed at all. Let the server decide what is
+                  // valid; the field just has to not get in the way.
+                  maxLength: 12,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onSubmitted: (_) => _verify(),
                   style: const TextStyle(
-                      color: DuetColors.text, fontSize: 28, letterSpacing: 8),
+                      color: DuetColors.text, fontSize: 26, letterSpacing: 6),
                   textAlign: TextAlign.center,
-                  decoration: _fieldDecoration('123456', 'Six-digit code')
+                  decoration: _fieldDecoration('', 'Code from your email')
                       .copyWith(counterText: ''),
                 ),
                 const SizedBox(height: 12),
