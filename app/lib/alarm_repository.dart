@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alarm.dart';
 import 'alarm_engine.dart';
+import 'alarm_sync.dart';
 import 'next_fire.dart';
+import 'uuid.dart';
 
 /// The app's alarm definitions, and the loop that turns them into OS alarms.
 ///
@@ -24,6 +26,15 @@ class AlarmRepository {
   List<Alarm> _alarms = [];
   bool _loaded = false;
 
+  /// Null when running without a backend. Everything below works either way --
+  /// that is the point of ADR-001, and why the app was built local-first.
+  AlarmSync? sync;
+  String? pairId;
+
+  /// Whether the last sync attempt reached the server. Surfaced in the UI so a
+  /// silent failure is never mistaken for "saved".
+  bool lastSyncOk = true;
+
   List<Alarm> get alarms => List.unmodifiable(_alarms);
 
   Future<void> load() async {
@@ -37,7 +48,49 @@ class AlarmRepository {
           .toList();
     }
     _loaded = true;
+
+    // Alarm ids must be uuids to map onto alarms.id. Anything created before
+    // sync existed gets a new one now, so an old install can still sync.
+    var migrated = false;
+    for (var i = 0; i < _alarms.length; i++) {
+      if (!isUuid(_alarms[i].id)) {
+        final old = _alarms[i];
+        _alarms[i] = Alarm(
+          id: newUuidV4(),
+          hour: old.hour,
+          minute: old.minute,
+          label: old.label,
+          enabled: old.enabled,
+          repeatDays: old.repeatDays,
+          oneShotDate: old.oneShotDate,
+          soundRef: old.soundRef,
+          snoozeMinutes: old.snoozeMinutes,
+          maxSnoozes: old.maxSnoozes,
+          ringTarget: old.ringTarget,
+        );
+        migrated = true;
+      }
+    }
+    if (migrated) await _persist();
+
     _sort();
+  }
+
+  /// Pulls remote changes, pushes local ones, then re-arms. Safe to call with
+  /// no backend: it simply reconciles what is already here.
+  Future<void> refresh() async {
+    await load();
+    final s = sync;
+    if (s != null) {
+      final result = await s.sync(_alarms, pairId: pairId);
+      lastSyncOk = result.synced;
+      if (result.synced) {
+        _alarms = result.alarms;
+        _sort();
+        await _persist();
+      }
+    }
+    await reconcile();
   }
 
   Future<void> _persist() async {
@@ -72,6 +125,9 @@ class AlarmRepository {
     await load();
     _alarms.removeWhere((a) => a.id == id);
     await _persist();
+    // A tombstone, not a row removal: the other device has to learn of the
+    // delete or it keeps ringing an alarm that no longer exists.
+    await sync?.softDelete(id);
     await reconcile();
   }
 
@@ -182,6 +238,7 @@ class AlarmRepository {
     }
   }
 
-  static String newId() =>
-      'a${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+  /// A uuid, so the id is valid both locally and as `alarms.id`, and so an
+  /// alarm can be created offline and merge cleanly later.
+  static String newId() => newUuidV4();
 }

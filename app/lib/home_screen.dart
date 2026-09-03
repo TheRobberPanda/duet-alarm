@@ -9,7 +9,13 @@ import 'diagnostics_screen.dart';
 import 'theme.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.partnerName, this.onInvite});
+
+  /// Null while solo -- either not signed in, or not yet paired.
+  final String? partnerName;
+
+  /// Non-null only when there is no partner yet: takes them back to pairing.
+  final VoidCallback? onInvite;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -46,7 +52,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _load() async {
     await _repo.load();
-    await _repo.reconcile();
+    // Pulls remote changes and pushes local ones when signed in; a plain
+    // reconcile when not. Either way the OS ends up holding the right alarms.
+    await _repo.refresh();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -107,6 +115,74 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ],
               ),
               const SizedBox(height: 14),
+
+              // Only shown when sync was attempted AND failed. Silence here
+              // would let someone believe an edit reached their partner when it
+              // did not -- the alarms still ring locally, but they are not
+              // shared until this clears.
+              if (widget.onInvite != null) ...[
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: widget.onInvite,
+                    child: DuetCard(
+                      child: Row(children: [
+                        const PairRing(size: 32, hasPartner: false, strokeWidth: 2),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Text(
+                            'Alarms ring on your phone only until someone joins '
+                            'you. Tap to invite them.',
+                            style: TextStyle(
+                                fontSize: 13.5,
+                                color: DuetColors.muted,
+                                height: 1.4),
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right,
+                            size: 18, color: DuetColors.faint),
+                      ]),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              if (widget.partnerName != null) ...[
+                DuetCard(
+                  child: Row(children: [
+                    const PairRing(size: 32, strokeWidth: 2),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text('You and ${widget.partnerName}',
+                          style: const TextStyle(
+                              fontSize: 15, color: DuetColors.text)),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              if (_repo.sync != null && !_repo.lastSyncOk) ...[
+                DuetCard(
+                  border: DuetColors.amber.withValues(alpha: 0.5),
+                  child: Row(children: [
+                    const Icon(Icons.cloud_off_outlined,
+                        color: DuetColors.amber, size: 20),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Not synced. Your alarms still ring on this phone, but '
+                        'changes have not reached your partner yet.',
+                        style: TextStyle(
+                            color: DuetColors.text, fontSize: 13.5, height: 1.4),
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               if (next != null)
                 Material(

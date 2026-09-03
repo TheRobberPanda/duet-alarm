@@ -21,6 +21,8 @@ class Alarm {
     this.snoozeMinutes = 9,
     this.maxSnoozes = 3,
     this.ringTarget = RingTarget.both,
+    this.pairId,
+    this.deletedAt,
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? DateTime.now();
 
@@ -46,7 +48,17 @@ class Alarm {
   /// the model does not have to change later.
   final RingTarget ringTarget;
 
+  /// The pair this alarm belongs to, or null while the user is solo. Set once
+  /// pairing exists so the alarm is visible to both people under RLS.
+  final String? pairId;
+
+  /// Soft delete. A tombstone has to reach the other device to disarm it there;
+  /// a hard delete that never syncs is an alarm that rings forever (docs/03).
+  final DateTime? deletedAt;
+
   final DateTime updatedAt;
+
+  bool get isDeleted => deletedAt != null;
 
   bool get repeats => repeatDays != Repeat.none;
   bool get snoozeAllowed => maxSnoozes > 0;
@@ -96,6 +108,8 @@ class Alarm {
     int? snoozeMinutes,
     int? maxSnoozes,
     RingTarget? ringTarget,
+    String? pairId,
+    DateTime? deletedAt,
   }) =>
       Alarm(
         id: id,
@@ -110,6 +124,8 @@ class Alarm {
         snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
         maxSnoozes: maxSnoozes ?? this.maxSnoozes,
         ringTarget: ringTarget ?? this.ringTarget,
+        pairId: pairId ?? this.pairId,
+        deletedAt: deletedAt ?? this.deletedAt,
         updatedAt: DateTime.now(),
       );
 
@@ -125,6 +141,8 @@ class Alarm {
         'snooze_minutes': snoozeMinutes,
         'max_snoozes': maxSnoozes,
         'ring_target': ringTarget.name,
+        'pair_id': pairId,
+        'deleted_at': deletedAt?.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
 
@@ -145,10 +163,71 @@ class Alarm {
           (t) => t.name == m['ring_target'],
           orElse: () => RingTarget.both,
         ),
+        pairId: m['pair_id'] as String?,
+        deletedAt: m['deleted_at'] == null
+            ? null
+            : DateTime.parse(m['deleted_at'] as String),
         updatedAt: m['updated_at'] == null
             ? null
             : DateTime.parse(m['updated_at'] as String),
       );
+
+  // ── Postgres mapping ──────────────────────────────────────────────────────
+  // Deliberately explicit rather than reusing toJson(): the local store and the
+  // database have different shapes (hour+minute here, a `time` column there),
+  // and quietly conflating them is how sync bugs start.
+
+  String get _localTimeSql =>
+      '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}:00';
+
+  Map<String, dynamic> toDbRow(String ownerId) => {
+        'id': id,
+        'pair_id': pairId,
+        'owner_id': ownerId,
+        'label': label,
+        'enabled': enabled,
+        'local_time': _localTimeSql,
+        'repeat_days': repeatDays,
+        'one_shot_date': oneShotDate == null
+            ? null
+            : '${oneShotDate!.year.toString().padLeft(4, '0')}-'
+                '${oneShotDate!.month.toString().padLeft(2, '0')}-'
+                '${oneShotDate!.day.toString().padLeft(2, '0')}',
+        'tz_mode': 'local',
+        'ring_target': ringTarget.name,
+        'snooze_minutes': snoozeMinutes,
+        'max_snoozes': maxSnoozes,
+        'deleted_at': deletedAt?.toIso8601String(),
+        // updated_at is set by a database trigger, never by us: sync resolves
+        // conflicts on it, and a client that could set it could win every one.
+      };
+
+  factory Alarm.fromDbRow(Map<String, dynamic> r, {String soundRef = 'default'}) {
+    final t = (r['local_time'] as String).split(':');
+    return Alarm(
+      id: r['id'] as String,
+      hour: int.parse(t[0]),
+      minute: int.parse(t[1]),
+      label: (r['label'] as String?) ?? '',
+      enabled: (r['enabled'] as bool?) ?? true,
+      repeatDays: (r['repeat_days'] as int?) ?? Repeat.none,
+      oneShotDate: r['one_shot_date'] == null
+          ? null
+          : DateTime.parse(r['one_shot_date'] as String),
+      soundRef: soundRef,
+      snoozeMinutes: (r['snooze_minutes'] as int?) ?? 9,
+      maxSnoozes: (r['max_snoozes'] as int?) ?? 3,
+      ringTarget: RingTarget.values.firstWhere(
+        (t) => t.name == r['ring_target'],
+        orElse: () => RingTarget.both,
+      ),
+      pairId: r['pair_id'] as String?,
+      deletedAt: r['deleted_at'] == null
+          ? null
+          : DateTime.parse(r['deleted_at'] as String),
+      updatedAt: DateTime.parse(r['updated_at'] as String),
+    );
+  }
 }
 
 enum RingTarget {

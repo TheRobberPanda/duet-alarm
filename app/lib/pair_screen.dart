@@ -12,9 +12,14 @@ import 'theme.dart';
 /// anywhere else, so the code is large, copyable, shareable, and the "enter
 /// theirs" path is one tap away.
 class PairScreen extends StatefulWidget {
-  const PairScreen({super.key, required this.onPaired});
+  const PairScreen({super.key, required this.onPaired, this.onSkip});
 
   final VoidCallback onPaired;
+
+  /// Continue alone. Blocking someone out of the app until their partner joins
+  /// is a good way to be uninstalled before the invite is even sent -- the
+  /// alarms have to be useful on day one, or there is no reason to keep it.
+  final VoidCallback? onSkip;
 
   @override
   State<PairScreen> createState() => _PairScreenState();
@@ -123,6 +128,14 @@ class _PairScreenState extends State<PairScreen> {
                   ),
                 ),
               ),
+              if (widget.onSkip != null)
+                Center(
+                  child: TextButton(
+                    onPressed: _busy ? null : widget.onSkip,
+                    child: const Text('Set up my alarms first',
+                        style: TextStyle(color: DuetColors.dim, fontSize: 14.5)),
+                  ),
+                ),
             ],
           ),
         ),

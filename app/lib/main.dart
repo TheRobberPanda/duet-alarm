@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'alarm_repository.dart';
+import 'alarm_sync.dart';
 import 'home_screen.dart';
 import 'pair_repository.dart';
 import 'pair_screen.dart';
@@ -78,6 +80,7 @@ class PairGate extends StatefulWidget {
 class _PairGateState extends State<PairGate> {
   final _repo = PairRepository.instance();
   Future<PairState?>? _pair;
+  bool _skippedPairing = false;
 
   @override
   void initState() {
@@ -91,7 +94,14 @@ class _PairGateState extends State<PairGate> {
   // awaited by the FutureBuilder; no async work happens inside setState.
   void _reload() {
     setState(() {
-      _pair = _repo.currentPair();
+      // Hand the alarm repository a sync source as a side effect of resolving
+      // the pair -- not inside build(), where side effects do not belong.
+      _pair = _repo.currentPair().then((pair) {
+        AlarmRepository.instance
+          ..sync = AlarmSync(Supabase.instance.client)
+          ..pairId = pair?.pairId;
+        return pair;
+      });
     });
   }
 
@@ -106,10 +116,19 @@ class _PairGateState extends State<PairGate> {
           );
         }
         final pair = snap.data;
-        if (pair == null || !pair.isComplete) {
-          return PairScreen(onPaired: _reload);
+        final paired = pair != null && pair.isComplete;
+
+        if (!paired && !_skippedPairing) {
+          return PairScreen(
+            onPaired: _reload,
+            onSkip: () => setState(() => _skippedPairing = true),
+          );
         }
-        return const HomeScreen();
+        return HomeScreen(
+          partnerName: paired ? pair.partner!.shortName : null,
+          onInvite:
+              paired ? null : () => setState(() => _skippedPairing = false),
+        );
       },
     );
   }
