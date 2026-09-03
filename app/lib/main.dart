@@ -85,7 +85,15 @@ class _PairGateState extends State<PairGate> {
     _reload();
   }
 
-  void _reload() => setState(() => _pair = _repo.currentPair());
+  // A BLOCK body, not an arrow. `setState(() => _pair = future)` returns the
+  // assignment's value -- a Future -- and Flutter rejects a setState callback
+  // that returns one, with a full-screen error. The future is stored here and
+  // awaited by the FutureBuilder; no async work happens inside setState.
+  void _reload() {
+    setState(() {
+      _pair = _repo.currentPair();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

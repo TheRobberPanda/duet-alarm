@@ -151,25 +151,31 @@ class _PairScreenState extends State<PairScreen> {
                     child: CircularProgressIndicator(color: DuetColors.amber)),
               )
             else
+              // Expanded, not fixed-width: six 44px cells plus margins overflow a
+              // 384dp screen by 12px, and the invite code is the one screen
+              // that must never look broken -- it is the whole growth engine.
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   for (final ch in code.split(''))
-                    Container(
-                      width: 44,
+                    Expanded(
+                      child: Container(
                       height: 58,
-                      margin: const EdgeInsets.symmetric(horizontal: 3.5),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: DuetColors.bg,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: DuetColors.line),
                       ),
-                      child: Text(ch,
-                          style: const TextStyle(
-                              fontSize: 26,
-                              color: DuetColors.text,
-                              fontFeatures: [FontFeature.tabularFigures()])),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(ch,
+                            style: const TextStyle(
+                                fontSize: 26,
+                                color: DuetColors.text,
+                                fontFeatures: [FontFeature.tabularFigures()])),
+                      ),
+                    ),
                     ),
                 ],
               ),

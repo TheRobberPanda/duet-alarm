@@ -28,3 +28,11 @@ _staging/
 *.iml
 .vscode/
 .DS_Store
+
+# Personal identity documents — must never be committed.
+"ID docs/"
+ID docs/
+*.jpg
+*.jpeg
+*.heic
+!app/android/app/src/main/res/**
