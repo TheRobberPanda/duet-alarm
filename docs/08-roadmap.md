@@ -15,8 +15,14 @@ on two phones. Prove that before building anything pretty.
 - **Milestone 2 — backend built and verified.** Postgres schema, RLS tested
   against a simulated attacker, pairing RPCs, account deletion. Flutter sign-in
   and pairing screens exist but are **gated off** behind `DUET_BACKEND`.
-- **Milestone 3 — the local half.** The app is genuinely usable standalone:
-  alarm list, editor, device-sound picker, alarm-health screen.
+- **Milestone 3 — verified end to end.** Alarms sync to Postgres and back.
+  Confirmed on device: an alarm created in the editor (18:00, Mon/Wed/Fri)
+  landed in `public.alarms` with `local_time='18:00:00'`, `repeat_days=21`
+  (the exact Mon+Wed+Fri bitmask), `pair_id=null` while solo, and a matching
+  `alarm_sounds` row keyed to the right listener -- RLS allowed the write
+  with no error. The app is also genuinely usable standalone: alarm list,
+  editor, device-sound picker, alarm-health screen, and now a working
+  "set up my alarms first" path so an unpaired user is never locked out.
 - Twelve-artboard design canvas; private GitHub repo.
 
 **Blocked on the outside world**
