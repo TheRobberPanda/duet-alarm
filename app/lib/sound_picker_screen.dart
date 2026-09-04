@@ -54,8 +54,14 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: DuetColors.muted),
-        title: const Text('Sound',
-            style: TextStyle(fontSize: 17, color: DuetColors.text)),
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Sound', style: TextStyle(fontSize: 17, color: DuetColors.text)),
+            SizedBox(width: 7),
+            HeartAccent(size: 14),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -117,12 +123,18 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(15),
           onTap: () => _tap(s),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               color: chosen ? DuetColors.surfaceRaised : DuetColors.surface,
               borderRadius: BorderRadius.circular(15),
-              border: chosen ? Border.all(color: DuetColors.amber) : null,
+              border: Border.all(
+                  color: chosen ? DuetColors.amber : Colors.transparent, width: 1.4),
+              boxShadow: chosen
+                  ? const [BoxShadow(color: Color(0x30F0A8C8), blurRadius: 14)]
+                  : null,
             ),
             child: Row(children: [
               Icon(
@@ -141,7 +153,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                 ),
               ),
               if (chosen)
-                const Icon(Icons.check, size: 19, color: DuetColors.amber),
+                const Icon(Icons.favorite_rounded, size: 17, color: DuetColors.amber),
             ]),
           ),
         ),

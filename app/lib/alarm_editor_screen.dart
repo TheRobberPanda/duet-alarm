@@ -171,13 +171,24 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
               borderRadius: BorderRadius.circular(16),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Text(
-                  '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(
-                      fontSize: 74,
-                      fontWeight: FontWeight.w200,
-                      letterSpacing: 2,
-                      color: DuetColors.text),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                          fontSize: 74,
+                          fontWeight: FontWeight.w200,
+                          letterSpacing: 2,
+                          color: DuetColors.text),
+                    ),
+                    const SizedBox(width: 8),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 14),
+                      child: HeartAccent(size: 18),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -282,14 +293,20 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
         final on = _repeatDays & bit != 0;
         return GestureDetector(
           onTap: () => setState(() => _repeatDays ^= bit),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
             width: 42,
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: on ? DuetColors.amber : DuetColors.surface,
+              gradient: on ? DuetColors.wash : null,
+              color: on ? null : DuetColors.surface,
               shape: BoxShape.circle,
               border: on ? null : Border.all(color: DuetColors.line),
+              boxShadow: on
+                  ? const [BoxShadow(color: Color(0x40F0A8C8), blurRadius: 10)]
+                  : null,
             ),
             child: Text(names[i],
                 style: TextStyle(
@@ -343,18 +360,20 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             return Expanded(
               child: GestureDetector(
                 onTap: () => setState(() => _target = t),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
                   height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: on ? const Color(0xFF342B25) : Colors.transparent,
+                    gradient: on ? DuetColors.wash : null,
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Text(t.label,
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: on ? FontWeight.w600 : FontWeight.w400,
-                          color: on ? DuetColors.text : DuetColors.dim)),
+                          color: on ? DuetColors.amberInk : DuetColors.dim)),
                 ),
               ),
             );

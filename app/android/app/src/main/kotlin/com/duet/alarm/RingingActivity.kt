@@ -13,10 +13,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -56,8 +52,6 @@ class RingingActivity : Activity() {
     private var pairId: String? = null
     private var awarenessView: TextView? = null
     private val pollHandler = Handler(Looper.getMainLooper())
-    private var sensorManager: SensorManager? = null
-    private var proximityTriggered = false
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
 
@@ -82,7 +76,6 @@ class RingingActivity : Activity() {
         )
 
         startAwarenessPolling()
-        startProximityGesture()
     }
 
     /**
@@ -120,36 +113,6 @@ class RingingActivity : Activity() {
         view.visibility = if (text == null) View.GONE else View.VISIBLE
     }
 
-    /**
-     * Wave-to-snooze: covering the top of the phone snoozes it without needing
-     * to look at or unlock the screen. Only armed when a snooze is actually
-     * available -- a wave over a phone with none left would do nothing, which
-     * is worse than the gesture not existing at all. [proximityTriggered]
-     * fires it once per ring rather than once per "near" reading, since the
-     * sensor stays near for as long as a hand or a pocket covers it.
-     */
-    private fun startProximityGesture() {
-        if (snoozesLeft <= 0) return
-        val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
-        val sensor = sm.getDefaultSensor(Sensor.TYPE_PROXIMITY) ?: return
-        sensorManager = sm
-        sm.registerListener(proximityListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
-    }
-
-    private val proximityListener = object : SensorEventListener {
-        override fun onSensorChanged(event: SensorEvent) {
-            if (proximityTriggered) return
-            val near = event.values.isNotEmpty() && event.values[0] < event.sensor.maximumRange
-            if (near) {
-                proximityTriggered = true
-                vibrateConfirm()
-                runOnUiThread { snooze() }
-            }
-        }
-
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-    }
-
     /** The one bit of feedback a gesture needs when the screen is about to
      *  close anyway -- there is no time for a visual confirmation to register. */
     private fun vibrateConfirm() {
@@ -179,7 +142,6 @@ class RingingActivity : Activity() {
 
     override fun onDestroy() {
         pollHandler.removeCallbacksAndMessages(null)
-        sensorManager?.unregisterListener(proximityListener)
         runCatching { unregisterReceiver(ringEnded) }
         super.onDestroy()
     }
@@ -304,7 +266,6 @@ class RingingActivity : Activity() {
                     snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
                     else -> "Snooze lasts $snoozeMinutes min"
                 },
-                "wave over the top to snooze".takeIf { snoozesLeft > 0 },
                 "hold Dismiss to end it for both".takeIf { pairId != null },
             ).joinToString(" · ")
             setTextColor(Color.parseColor("#776273"))
