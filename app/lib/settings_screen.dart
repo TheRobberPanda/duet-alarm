@@ -87,6 +87,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _load();
   }
 
+  Future<void> _setAccent(String skinId) async {
+    // Instant locally -- SkinColors is what every PairRing actually reads,
+    // and this screen shouldn't feel like it's waiting on the network to
+    // show you your own choice.
+    SkinColors.instance.setSkins(mine: skinId, partner: null);
+    setState(() => _profile = _profile == null
+        ? null
+        : Profile(
+            id: _profile!.id,
+            displayName: _profile!.displayName,
+            timezone: _profile!.timezone,
+            allowPartnerDismiss: _profile!.allowPartnerDismiss,
+            accent: skinId,
+          ));
+    await _repo.updateAccent(skinId);
+    await _load();
+  }
+
   Future<void> _leavePair() async {
     final ok = await _confirm(
       title: 'Leave this pair?',
@@ -283,6 +301,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ]),
                 ),
               ],
+
+              const SizedBox(height: 28),
+              const SectionLabel('Your theme'),
+              const SizedBox(height: 10),
+              DuetCard(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: duetSkins.map((skin) {
+                    final on = (_profile?.accent ?? 'teal') == skin.id;
+                    return GestureDetector(
+                      onTap: () => _setAccent(skin.id),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: skin.color.withValues(alpha: on ? 1 : 0.35),
+                              border: on
+                                  ? Border.all(color: DuetColors.text, width: 2)
+                                  : null,
+                              boxShadow: on
+                                  ? [BoxShadow(color: skin.color.withValues(alpha: 0.5), blurRadius: 14)]
+                                  : null,
+                            ),
+                            child: Icon(skin.icon,
+                                size: 22,
+                                color: on
+                                    ? DuetColors.amberInk
+                                    : DuetColors.text.withValues(alpha: 0.6)),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(skin.label,
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: on ? DuetColors.text : DuetColors.dim)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Your half of the ring, everywhere it shows up -- theirs too, '
+                'once they pick one.',
+                style: TextStyle(fontSize: 12, color: DuetColors.faint, height: 1.4),
+              ),
 
               if (_error != null) ...[
                 const SizedBox(height: 16),

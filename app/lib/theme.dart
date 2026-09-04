@@ -348,6 +348,65 @@ class DuetPageRoute<T> extends PageRouteBuilder<T> {
         );
 }
 
+/// A selectable look for one side of the pair. Stored as `profiles.accent`
+/// (already existed in the schema, unused until now) -- picking one only ever
+/// changes what color YOUR half of the ring paints, everywhere it appears,
+/// including on your partner's phone once their app re-reads your profile.
+class DuetSkin {
+  const DuetSkin(this.id, this.label, this.color, this.icon);
+
+  final String id;
+  final String label;
+  final Color color;
+  final IconData icon;
+}
+
+const duetSkins = [
+  DuetSkin('teal', 'Classic', DuetColors.teal, Icons.favorite_rounded),
+  DuetSkin('blue', 'Blue', Color(0xFF6FA8DC), Icons.water_drop_rounded),
+  DuetSkin('fish', 'Fish', Color(0xFF4FBFB0), Icons.set_meal_rounded),
+  DuetSkin('horse', 'Horse', Color(0xFFC99A6B), Icons.pets_rounded),
+];
+
+DuetSkin skinFor(String? id) =>
+    duetSkins.firstWhere((s) => s.id == id, orElse: () => duetSkins.first);
+
+/// The two ring colors currently in effect, one per person. A tiny global
+/// notifier rather than a constructor param on every [PairRing] -- the ring
+/// appears in ~15 places across the app, and a skin choice has to reach every
+/// one of them the moment it changes, not just the screen that changed it.
+/// Whoever resolves the pair (today: [PairGate] in main.dart) is responsible
+/// for calling [setSkins] once profiles are loaded; unset defaults to the
+/// original pink/lavender pairing so a solo or backend-less run looks exactly
+/// as it always did.
+class SkinColors extends ChangeNotifier {
+  SkinColors._();
+  static final instance = SkinColors._();
+
+  // "mine" paints the right half (the "you" arc, historically teal); "partner"
+  // paints the left half (the "them" arc, historically amber/pink). Matching
+  // _PairRingPainter's existing convention below, not swapping it.
+  Color mine = DuetColors.teal;
+  Color partner = DuetColors.amber;
+
+  /// Either argument left null means "leave that side as it is" -- NOT
+  /// "reset to default". The settings screen relies on this to update only
+  /// its own side without clobbering whatever the partner's was last read as.
+  void setSkins({String? mine, String? partner}) {
+    final newMine = mine != null ? skinFor(mine).color : this.mine;
+    var newPartner = partner != null ? skinFor(partner).color : this.partner;
+    // Both sides still sitting on the same never-picked default ('teal', the
+    // db column's original placeholder before skins existed) would otherwise
+    // paint one solid ring instead of the two-tone signature. Fall back to the
+    // classic partner color until the two actually diverge by real choice.
+    if (newPartner == newMine) newPartner = DuetColors.amber;
+    if (newMine == this.mine && newPartner == this.partner) return;
+    this.mine = newMine;
+    this.partner = newPartner;
+    notifyListeners();
+  }
+}
+
 /// The two-tone ring: the app's signature mark. Pink is you, lavender is the
 /// partner. A half ring (partner absent) reads as "waiting for someone". A
 /// slow breathing pulse keeps it feeling alive without being distracting at
@@ -385,32 +444,48 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    final ring = SizedBox(
-      // CustomPaint only honours `size` when it is otherwise unconstrained —
-      // inside a stretching Column it would expand to the full width and the
-      // ring would swallow the screen. The SizedBox pins it either way.
-      width: widget.size,
-      height: widget.size,
-      child: CustomPaint(
-        size: Size(widget.size, widget.size),
-        painter: _PairRingPainter(hasPartner: widget.hasPartner, strokeWidth: widget.strokeWidth),
-      ),
-    );
-    if (!widget.animate) return ring;
+    // Rebuilds whenever a skin changes anywhere in the app, on top of this
+    // ring's own breathing pulse -- Listenable.merge so one AnimatedBuilder
+    // covers both without a second listener.
     return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) =>
-          Transform.scale(scale: 1 + _controller.value * 0.035, child: child),
-      child: ring,
+      animation: Listenable.merge([_controller, SkinColors.instance]),
+      builder: (context, child) {
+        final ring = SizedBox(
+          // CustomPaint only honours `size` when it is otherwise unconstrained
+          // -- inside a stretching Column it would expand to the full width
+          // and the ring would swallow the screen. The SizedBox pins it either
+          // way.
+          width: widget.size,
+          height: widget.size,
+          child: CustomPaint(
+            size: Size(widget.size, widget.size),
+            painter: _PairRingPainter(
+              hasPartner: widget.hasPartner,
+              strokeWidth: widget.strokeWidth,
+              mine: SkinColors.instance.mine,
+              partner: SkinColors.instance.partner,
+            ),
+          ),
+        );
+        if (!widget.animate) return ring;
+        return Transform.scale(scale: 1 + _controller.value * 0.035, child: ring);
+      },
     );
   }
 }
 
 class _PairRingPainter extends CustomPainter {
-  _PairRingPainter({required this.hasPartner, required this.strokeWidth});
+  _PairRingPainter({
+    required this.hasPartner,
+    required this.strokeWidth,
+    required this.mine,
+    required this.partner,
+  });
 
   final bool hasPartner;
   final double strokeWidth;
+  final Color mine;
+  final Color partner;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -431,13 +506,16 @@ class _PairRingPainter extends CustomPainter {
       ..color = colour;
 
     // Right half = you, left half = them.
-    canvas.drawArc(rect, -1.5708, 3.1416, false, arc(DuetColors.teal));
+    canvas.drawArc(rect, -1.5708, 3.1416, false, arc(mine));
     if (hasPartner) {
-      canvas.drawArc(rect, 1.5708, 3.1416, false, arc(DuetColors.amber));
+      canvas.drawArc(rect, 1.5708, 3.1416, false, arc(partner));
     }
   }
 
   @override
   bool shouldRepaint(_PairRingPainter old) =>
-      old.hasPartner != hasPartner || old.strokeWidth != strokeWidth;
+      old.hasPartner != hasPartner ||
+      old.strokeWidth != strokeWidth ||
+      old.mine != mine ||
+      old.partner != partner;
 }

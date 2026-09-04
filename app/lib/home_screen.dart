@@ -7,6 +7,7 @@ import 'alarm_editor_screen.dart';
 import 'alarm_repository.dart';
 import 'diagnostics_screen.dart';
 import 'main.dart' show kBackendEnabled;
+import 'pair_repository.dart';
 import 'settings_screen.dart';
 import 'theme.dart';
 
@@ -28,6 +29,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _tick;
   bool _loading = true;
 
+  // The rotating tip banner -- a game-loading-screen-style line that cycles on
+  // its own timer, independent of the 30s clock tick above.
+  Timer? _tipTicker;
+  int _tipIndex = 0;
+  int? _myDismissed;
+  int? _partnerDismissed;
+
   @override
   void initState() {
     super.initState();
@@ -36,11 +44,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
+    _tipTicker = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted) setState(() => _tipIndex++);
+    });
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _tipTicker?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -58,6 +70,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // reconcile when not. Either way the OS ends up holding the right alarms.
     await _repo.refresh();
     if (mounted) setState(() => _loading = false);
+
+    // Only meaningful once paired -- a solo user has no one to compare with.
+    if (kBackendEnabled && widget.partnerName != null) {
+      final counts = await PairRepository.instance().myDismissCounts();
+      if (mounted) {
+        setState(() {
+          _myDismissed = counts['mine'];
+          _partnerDismissed = counts['partner'];
+        });
+      }
+    }
+  }
+
+  /// Flavor lines plus, once both dismiss counts are in, a live standing --
+  /// deliberately phrased like a loading-screen tip rather than a scoreboard.
+  List<String> _tips() {
+    final tips = <String>[
+      'Tip: hold Dismiss to end the alarm for both of you at once.',
+      'Tip: pick a theme in Settings -- it repaints your half of the ring '
+          'everywhere it shows up.',
+    ];
+    final mine = _myDismissed, theirs = _partnerDismissed;
+    if (mine != null && theirs != null) {
+      final partner = widget.partnerName ?? 'They';
+      final line = mine == theirs
+          ? "You're tied with $partner: $mine dismissals each."
+          : mine > theirs
+              ? "You're ahead of $partner: $mine dismissals to their $theirs."
+              : "$partner is ahead: $theirs dismissals to your $mine.";
+      tips.insert(0, line);
+    }
+    return tips;
   }
 
   Future<void> _edit([Alarm? existing]) async {
@@ -184,6 +228,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ]),
                 ),
+                const SizedBox(height: 10),
+                Builder(builder: (context) {
+                  final tips = _tips();
+                  final tip = tips[_tipIndex % tips.length];
+                  return DuetCard(
+                    child: Row(children: [
+                      const Icon(Icons.auto_awesome, size: 15, color: DuetColors.amber),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 320),
+                          child: Text(
+                            tip,
+                            key: ValueKey(tip),
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                fontStyle: FontStyle.italic,
+                                color: DuetColors.muted,
+                                height: 1.35),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  );
+                }),
                 const SizedBox(height: 12),
               ],
 

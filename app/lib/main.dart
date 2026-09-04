@@ -127,10 +127,15 @@ class _PairGateState extends State<PairGate> {
     setState(() {
       // Hand the alarm repository a sync source as a side effect of resolving
       // the pair -- not inside build(), where side effects do not belong.
-      _pair = _repo.currentPair().then((pair) {
+      _pair = _repo.currentPair().then((pair) async {
         AlarmRepository.instance
           ..sync = AlarmSync(Supabase.instance.client)
           ..pairId = pair?.pairId;
+        // Every PairRing in the app reads its two colors from here -- see
+        // theme.dart's SkinColors. myProfile() is a second round trip, but
+        // this only runs on sign-in/pairing changes, not on every rebuild.
+        final me = await _repo.myProfile();
+        SkinColors.instance.setSkins(mine: me?.accent, partner: pair?.partner?.accent);
         return pair;
       });
     });

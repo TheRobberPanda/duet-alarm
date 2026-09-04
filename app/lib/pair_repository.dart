@@ -73,6 +73,51 @@ class PairRepository {
     await _db.from('profiles').update({'timezone': ianaName}).eq('id', id);
   }
 
+  /// Your skin choice (theme.dart's `duetSkins`) -- reuses the `accent` column,
+  /// which existed unused since Milestone 2. Changing it only ever paints YOUR
+  /// half of every PairRing in the app, including on your partner's phone the
+  /// next time their app re-reads your profile.
+  Future<void> updateAccent(String skinId) async {
+    final id = currentUser?.id;
+    if (id == null) return;
+    await _db.from('profiles').update({'accent': skinId}).eq('id', id);
+  }
+
+  /// How many alarms each of you has personally dismissed, for the home
+  /// screen's rotating tip banner. Counted client-side rather than via a
+  /// server aggregate: the numbers are small (a couple of alarms a day), and
+  /// `ring_participants` has no surrogate key to run a Postgres `count()`
+  /// against cheaply through PostgREST's filter-only interface.
+  Future<Map<String, int>> dismissCounts(List<String> userIds) async {
+    if (userIds.isEmpty) return {};
+    final rows = await _db
+        .from('ring_participants')
+        .select('user_id')
+        .eq('state', 'dismissed')
+        .inFilter('user_id', userIds);
+    final counts = {for (final id in userIds) id: 0};
+    for (final row in rows) {
+      final id = row['user_id'] as String;
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Convenience for the home screen's tip banner: resolves the pair and both
+  /// dismiss counts in one call. `'partner'` is absent while solo or
+  /// unpaired -- there is no one to compare with yet.
+  Future<Map<String, int>> myDismissCounts() async {
+    final me = currentUser?.id;
+    if (me == null) return {};
+    final pair = await currentPair();
+    final partnerId = pair?.partner?.id;
+    final byId = await dismissCounts([me, ?partnerId]);
+    return {
+      'mine': byId[me] ?? 0,
+      if (partnerId != null) 'partner': byId[partnerId] ?? 0,
+    };
+  }
+
   // ── Pairing ──────────────────────────────────────────────────────────────
 
   /// Creates the caller's pair if they have none and returns a fresh code.
@@ -150,7 +195,7 @@ class Profile {
         displayName: (m['display_name'] as String?) ?? '',
         timezone: (m['timezone'] as String?) ?? 'UTC',
         allowPartnerDismiss: (m['allow_partner_dismiss'] as bool?) ?? true,
-        accent: (m['accent'] as String?) ?? 'amber',
+        accent: (m['accent'] as String?) ?? 'teal',
       );
 }
 
