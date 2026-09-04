@@ -4,7 +4,7 @@ Build order is chosen so the **riskiest thing gets proven first**. The risk in t
 project is not the UI or the backend; it is whether a shared alarm reliably rings
 on two phones. Prove that before building anything pretty.
 
-## Where things actually stand (2026-09-02)
+## Where things actually stand (2026-09-04)
 
 **Done**
 
@@ -12,39 +12,55 @@ on two phones. Prove that before building anything pretty.
   service, lock-screen ringing, direct-boot survival, snooze with a real
   allowance, notification actions, self-perpetuating repeats, timezone
   recomputation. Six of fourteen device tests pass (1, 2, 3, 9, 10, 11).
-- **Milestone 2 — backend built and verified.** Postgres schema, RLS tested
-  against a simulated attacker, pairing RPCs, account deletion. Flutter sign-in
-  and pairing screens exist but are **gated off** behind `DUET_BACKEND`.
-- **Milestone 3 — verified end to end.** Alarms sync to Postgres and back.
-  Confirmed on device: an alarm created in the editor (18:00, Mon/Wed/Fri)
-  landed in `public.alarms` with `local_time='18:00:00'`, `repeat_days=21`
-  (the exact Mon+Wed+Fri bitmask), `pair_id=null` while solo, and a matching
-  `alarm_sounds` row keyed to the right listener -- RLS allowed the write
-  with no error. The app is also genuinely usable standalone: alarm list,
-  editor, device-sound picker, alarm-health screen, and now a working
+- **Milestone 2 — backend built and verified, and now actually reachable.**
+  Postgres schema, RLS tested against a simulated attacker, pairing RPCs,
+  account deletion. Real two-device pairing verified on hardware (two real
+  phones, two real accounts, the real invite-code flow) -- this found and
+  fixed a real bug: redeeming a code was blocked by the one-active-pair
+  trigger because opening the invite screen silently enrolled the redeemer in
+  their own solo pair first. A settings screen now exposes the profile and
+  `allow_partner_dismiss` toggle from inside the standalone app instead of
+  only the gated build.
+- **Milestone 3 — verified end to end, twice over.** Alarms sync to Postgres
+  and back, including alarms created before pairing completes (found and
+  fixed a bug here too: the pair-stamp step could silently push the
+  unstamped copy). The app is genuinely usable standalone: alarm list,
+  editor, device-sound picker, alarm-health screen, settings, and a working
   "set up my alarms first" path so an unpaired user is never locked out.
+- **Milestone 4, started.** Ring sessions now report to Postgres the instant
+  a shared alarm fires, and the ringing screen polls for the partner's state
+  and shows a live awareness line ("They're ringing too" / "They snoozed" /
+  "They're up"). Verified end to end on hardware for the create+dismiss
+  round trip; the awareness strip itself is unverified (no phone connected
+  the session it was built).
+- **The real app icon**, replacing Flutter's default: a couple and an alarm
+  clock, installed at all five mipmap densities.
+- **A full re-theme to match the icon** -- pink and lavender in place of the
+  original amber and teal, plus real motion throughout (a breathing pair
+  ring, press feedback on buttons, staggered list entrances, cross-fades
+  between auth/pairing/home).
 - Twelve-artboard design canvas; private GitHub repo.
 
 **Blocked on the outside world**
 
-- Supabase email template needs `{{ .Token }}`, and custom SMTP before any
-  real testers (supabase/README.md). Until then the backend stays gated off.
 - Play Console identity verification (address needs correcting), then the
   12-tester / 14-day closed-test clock (docs/12 §1.3).
 
 **Not started**
 
-- Shared alarms over the network, the multiplayer ring session, the
-  "for both of us" controls, wake receipts, themes, missions, monetisation,
-  store listing.
-- **The app still ships Flutter's default launcher icon.** Small job, but it is
-  the first thing anyone sees.
-- No settings screen in the standalone app (the `allow_partner_dismiss` toggle
-  and profile live only in the gated-off pairing build).
+- The rest of Milestone 4: "for both of us" dismiss/snooze (needs the
+  partner's user id threaded to the ring path, not just their state --
+  deliberately not built blind without a device to verify a cross-device
+  dismiss actually does what it says), realtime/push instead of polling,
+  `allow_partner_dismiss` enforcement on that path.
+- Wake receipts, themes, missions, monetisation, store listing.
 
-**The single most important outstanding item is Milestone 0 test 14** —
-overnight, offline, in a drawer. Everything else is building on an assumption
-that has not yet been proven for a full night.
+**The single most important outstanding item is still Milestone 0 test 14**
+-- overnight, offline, in a drawer. Everything else is building on an
+assumption that has not yet been proven for a full night. Second most
+important: an actual device pass on everything built in this session's
+back half (the awareness strip and the settings screen), none of which has
+touched real hardware yet.
 
 ## Milestone 0 — Prove the alarm (Android only)
 
