@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 
-/// The palette from the design canvas (design/*.dc.html).
+/// The palette, re-themed to match the app icon (docs/08): a warm, near-black
+/// plum rather than pure black -- the app is looked at by a half-asleep person
+/// in a dark room, and #000 with white text is harsh at 06:00.
 ///
-/// Warm near-black rather than pure black: the app is looked at by a half-asleep
-/// person in a dark room, and #000 with white text is harsh at 06:00.
-///
-/// [amber] and [teal] are the two partner accents. Every shared element shows
-/// both, so a glance tells you which half is yours — that is the app's signature,
-/// not decoration (ADR-013).
+/// [amber] and [teal] keep their names (41 call sites lean on them) but are now
+/// the icon's pink and lavender -- the two partner accents. Every shared
+/// element shows both, so a glance tells you which half is yours. That is the
+/// app's signature, not decoration (ADR-013).
 class DuetColors {
-  static const bg = Color(0xFF171310);
-  static const bgDeep = Color(0xFF141110);
-  static const surface = Color(0xFF1E1815);
-  static const surfaceRaised = Color(0xFF2A211B);
-  static const line = Color(0xFF352C27);
+  static const bg = Color(0xFF1A1218);
+  static const bgDeep = Color(0xFF150F14);
+  static const surface = Color(0xFF251A22);
+  static const surfaceRaised = Color(0xFF33232D);
+  static const line = Color(0xFF402C38);
 
-  static const text = Color(0xFFF5EDE6);
-  static const muted = Color(0xFFB2A398);
-  static const dim = Color(0xFF7C6E66);
-  static const faint = Color(0xFF544942);
+  static const text = Color(0xFFF9EBF3);
+  static const muted = Color(0xFFCBA8BE);
+  static const dim = Color(0xFF937284);
+  static const faint = Color(0xFF5F4555);
 
-  static const amber = Color(0xFFE9A35B);
-  static const amberInk = Color(0xFF1B120A);
-  static const teal = Color(0xFF5FB3AE);
-  static const danger = Color(0xFFC98274);
+  static const amber = Color(0xFFF0A8C8);
+  static const amberInk = Color(0xFF3D1526);
+  static const teal = Color(0xFFC9AEE8);
+  static const danger = Color(0xFFE87DA0);
 }
 
 ThemeData duetTheme() => ThemeData(
@@ -85,7 +85,7 @@ class DuetCard extends StatelessWidget {
       );
 }
 
-class DuetButton extends StatelessWidget {
+class DuetButton extends StatefulWidget {
   const DuetButton(this.label, {super.key, this.onTap, this.filled = false, this.busy = false});
 
   final String label;
@@ -94,21 +94,32 @@ class DuetButton extends StatelessWidget {
   final bool busy;
 
   @override
+  State<DuetButton> createState() => _DuetButtonState();
+}
+
+class _DuetButtonState extends State<DuetButton> {
+  // A press-scale, not a ripple replacement: the platform button underneath
+  // still owns the real gesture and its own feedback. This is purely tactile
+  // -- a Listener rather than a GestureDetector so it never competes for the
+  // tap in the gesture arena.
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    final child = busy
+    final child = widget.busy
         ? const SizedBox(
             height: 20, width: 20,
             child: CircularProgressIndicator(strokeWidth: 2, color: DuetColors.amberInk))
-        : Text(label,
+        : Text(widget.label,
             style: TextStyle(
-                fontSize: filled ? 16.5 : 15.5,
-                fontWeight: filled ? FontWeight.w600 : FontWeight.w500));
+                fontSize: widget.filled ? 16.5 : 15.5,
+                fontWeight: widget.filled ? FontWeight.w600 : FontWeight.w500));
 
-    return SizedBox(
+    final button = SizedBox(
       height: 52,
-      child: filled
+      child: widget.filled
           ? FilledButton(
-              onPressed: busy ? null : onTap,
+              onPressed: widget.busy ? null : widget.onTap,
               style: FilledButton.styleFrom(
                 backgroundColor: DuetColors.amber,
                 foregroundColor: DuetColors.amberInk,
@@ -117,7 +128,7 @@ class DuetButton extends StatelessWidget {
               ),
               child: child)
           : OutlinedButton(
-              onPressed: busy ? null : onTap,
+              onPressed: widget.busy ? null : widget.onTap,
               style: OutlinedButton.styleFrom(
                 foregroundColor: DuetColors.text,
                 side: const BorderSide(color: DuetColors.line),
@@ -125,30 +136,138 @@ class DuetButton extends StatelessWidget {
               ),
               child: child),
     );
+
+    return Listener(
+      onPointerDown: (_) => setState(() => _pressed = true),
+      onPointerUp: (_) => setState(() => _pressed = false),
+      onPointerCancel: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: button,
+      ),
+    );
   }
 }
 
-/// The two-tone ring: the app's signature mark. Amber is the partner, teal is
-/// you. A half ring (partner absent) reads as "waiting for someone".
-class PairRing extends StatelessWidget {
-  const PairRing({super.key, this.size = 56, this.hasPartner = true, this.strokeWidth = 2.5});
+/// Fades and lifts a widget into place once, on first mount -- used for list
+/// entrances so a screen builds itself in rather than snapping into existence.
+/// Give it a stable [key] (the alarm's id) when the surrounding list can
+/// reorder, or a reorder will read as a re-entrance.
+class FadeSlideIn extends StatefulWidget {
+  const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero});
+
+  final Widget child;
+  final Duration delay;
+
+  @override
+  State<FadeSlideIn> createState() => _FadeSlideInState();
+}
+
+class _FadeSlideInState extends State<FadeSlideIn> {
+  bool _shown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(widget.delay, () {
+      if (mounted) setState(() => _shown = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedSlide(
+        offset: _shown ? Offset.zero : const Offset(0, 0.08),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: _shown ? 1 : 0,
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOut,
+          child: widget.child,
+        ),
+      );
+}
+
+/// A softer push than the platform default: fade plus a gentle lift, matching
+/// the rest of the app's motion rather than Android's flat slide-in.
+class DuetPageRoute<T> extends PageRouteBuilder<T> {
+  DuetPageRoute({required WidgetBuilder builder})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => builder(context),
+          transitionDuration: const Duration(milliseconds: 320),
+          reverseTransitionDuration: const Duration(milliseconds: 240),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+            return FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
+                    .animate(curved),
+                child: child,
+              ),
+            );
+          },
+        );
+}
+
+/// The two-tone ring: the app's signature mark. Pink is you, lavender is the
+/// partner. A half ring (partner absent) reads as "waiting for someone". A
+/// slow breathing pulse keeps it feeling alive without being distracting at
+/// 06:00 -- set [animate] false anywhere that needs a perfectly static mark
+/// (e.g. inside something else already animating).
+class PairRing extends StatefulWidget {
+  const PairRing({
+    super.key,
+    this.size = 56,
+    this.hasPartner = true,
+    this.strokeWidth = 2.5,
+    this.animate = true,
+  });
 
   final double size;
   final bool hasPartner;
   final double strokeWidth;
+  final bool animate;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        // CustomPaint only honours `size` when it is otherwise unconstrained —
-        // inside a stretching Column it would expand to the full width and the
-        // ring would swallow the screen. The SizedBox pins it either way.
-        width: size,
-        height: size,
-        child: CustomPaint(
-          size: Size(size, size),
-          painter: _PairRingPainter(hasPartner: hasPartner, strokeWidth: strokeWidth),
-        ),
-      );
+  State<PairRing> createState() => _PairRingState();
+}
+
+class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 3),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ring = SizedBox(
+      // CustomPaint only honours `size` when it is otherwise unconstrained —
+      // inside a stretching Column it would expand to the full width and the
+      // ring would swallow the screen. The SizedBox pins it either way.
+      width: widget.size,
+      height: widget.size,
+      child: CustomPaint(
+        size: Size(widget.size, widget.size),
+        painter: _PairRingPainter(hasPartner: widget.hasPartner, strokeWidth: widget.strokeWidth),
+      ),
+    );
+    if (!widget.animate) return ring;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) =>
+          Transform.scale(scale: 1 + _controller.value * 0.035, child: child),
+      child: ring,
+    );
+  }
 }
 
 class _PairRingPainter extends CustomPainter {

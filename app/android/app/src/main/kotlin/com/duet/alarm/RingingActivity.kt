@@ -102,12 +102,12 @@ class RingingActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(Color.parseColor("#141110"))
+            setBackgroundColor(Color.parseColor("#150F14"))
             setPadding(dp(24), dp(40), dp(24), dp(28))
         }
 
         // ── The dial: two-tone ring with the time inside ──────────────────────
-        // Amber is your partner, teal is you. Even alone, the ring is the app's
+        // Lavender is you, pink is your partner. Even alone, the ring is the app's
         // signature mark and the thing that says "this is Duet, not a stock
         // alarm" to someone squinting at 06:00.
         val dial = FrameLayout(this)
@@ -122,14 +122,14 @@ class RingingActivity : Activity() {
         }
         inner.addView(TextView(this).apply {
             text = label.uppercase()
-            setTextColor(Color.parseColor("#A08C7C"))
+            setTextColor(Color.parseColor("#A88B9B"))
             textSize = 12f
             letterSpacing = 0.22f
             gravity = Gravity.CENTER
         })
         inner.addView(TextView(this).apply {
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            setTextColor(Color.parseColor("#FBF5EF"))
+            setTextColor(Color.parseColor("#FBF0F6"))
             textSize = 62f
             typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
             letterSpacing = 0.03f
@@ -139,7 +139,7 @@ class RingingActivity : Activity() {
         })
         inner.addView(TextView(this).apply {
             text = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
-            setTextColor(Color.parseColor("#8A7C72"))
+            setTextColor(Color.parseColor("#8F7A88"))
             textSize = 13f
             gravity = Gravity.CENTER
         })
@@ -160,12 +160,12 @@ class RingingActivity : Activity() {
 
         if (snoozesLeft > 0) {
             controls.addView(
-                actionButton("Snooze", "#241D18", "#F5EDE6", outlined = true) { snooze() },
+                actionButton("Snooze", "#33232D", "#F5EDE6", outlined = true) { snooze() },
                 LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; rightMargin = dp(6) }
             )
         }
         controls.addView(
-            actionButton("Dismiss", "#E9A35B", "#1B120A", outlined = false) { dismiss() },
+            actionButton("Dismiss", "#F0A8C8", "#3D1526", outlined = false) { dismiss() },
             LinearLayout.LayoutParams(0, dp(72)).apply {
                 weight = 1f
                 if (snoozesLeft > 0) leftMargin = dp(6)
@@ -180,7 +180,7 @@ class RingingActivity : Activity() {
                 snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
                 else -> "Snooze lasts $snoozeMinutes min"
             }
-            setTextColor(Color.parseColor("#6E625B"))
+            setTextColor(Color.parseColor("#776273"))
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(0, dp(14), 0, 0)
@@ -199,7 +199,7 @@ class RingingActivity : Activity() {
         background = GradientDrawable().apply {
             cornerRadius = dp(20).toFloat()
             setColor(Color.parseColor(bg))
-            if (outlined) setStroke(dp(1), Color.parseColor("#3E332B"))
+            if (outlined) setStroke(dp(1), Color.parseColor("#4A3540"))
         }
         stateListAnimator = null
         setOnClickListener { onClick() }
@@ -240,22 +240,22 @@ class RingingActivity : Activity() {
 
 /**
  * The two-tone ring, drawn rather than bundled so it scales to any density and
- * needs no asset. Right half teal (you), left half amber (them).
+ * needs no asset. Right half lavender (you), left half pink (them).
  */
 private class PairRingView(context: Context) : View(context) {
     private val track = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.parseColor("#2A231E")
+        color = Color.parseColor("#33232D")
     }
     private val you = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        color = Color.parseColor("#5FB3AE")
+        color = Color.parseColor("#C9AEE8")
     }
     private val them = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        color = Color.parseColor("#E9A35B")
+        color = Color.parseColor("#F0A8C8")
     }
 
     override fun onDraw(canvas: Canvas) {

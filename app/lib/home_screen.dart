@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _edit([Alarm? existing]) async {
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => AlarmEditorScreen(alarm: existing)),
+      DuetPageRoute(builder: (_) => AlarmEditorScreen(alarm: existing)),
     );
     if (saved == true) await _load();
   }
@@ -109,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         color: DuetColors.dim, size: 22),
                     tooltip: 'Alarm health',
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const DiagnosticsScreen()),
+                      DuetPageRoute(builder: (_) => const DiagnosticsScreen()),
                     ),
                   ),
                 ],
@@ -185,12 +185,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ],
 
               if (next != null)
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () => _edit(next.alarm),
-                    child: _nextCard(next.alarm, next.at),
+                FadeSlideIn(
+                  key: ValueKey('next-${next.alarm.id}'),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () => _edit(next.alarm),
+                      child: _nextCard(next.alarm, next.at),
+                    ),
                   ),
                 ),
               if (next == null && alarms.isNotEmpty) ...[
@@ -206,7 +209,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 26),
                 SectionLabel('All alarms (${alarms.length})'),
                 const SizedBox(height: 10),
-                ...alarms.map(_alarmRow),
+                ...alarms.asMap().entries.map((e) => FadeSlideIn(
+                      key: ValueKey(e.value.id),
+                      delay: Duration(milliseconds: 45 * e.key),
+                      child: _alarmRow(e.value),
+                    )),
               ],
             ],
           ),

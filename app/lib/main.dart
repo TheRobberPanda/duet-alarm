@@ -80,8 +80,16 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         final session = snapshot.data?.session ??
             Supabase.instance.client.auth.currentSession;
-        if (session == null) return const SignInScreen();
-        return const PairGate();
+        // A cross-fade rather than a hard swap: signing in and getting pulled
+        // into pairing should feel like one continuous motion, not a jump cut.
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 380),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: session == null
+              ? const SignInScreen(key: ValueKey('signin'))
+              : const PairGate(key: ValueKey('pair')),
+        );
       },
     );
   }
@@ -137,16 +145,23 @@ class _PairGateState extends State<PairGate> {
         final pair = snap.data;
         final paired = pair != null && pair.isComplete;
 
-        if (!paired && !_skippedPairing) {
-          return PairScreen(
-            onPaired: _reload,
-            onSkip: () => setState(() => _skippedPairing = true),
-          );
-        }
-        return HomeScreen(
-          partnerName: paired ? pair.partner!.shortName : null,
-          onInvite:
-              paired ? null : () => setState(() => _skippedPairing = false),
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 380),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: !paired && !_skippedPairing
+              ? PairScreen(
+                  key: const ValueKey('invite'),
+                  onPaired: _reload,
+                  onSkip: () => setState(() => _skippedPairing = true),
+                )
+              : HomeScreen(
+                  key: const ValueKey('home'),
+                  partnerName: paired ? pair.partner!.shortName : null,
+                  onInvite: paired
+                      ? null
+                      : () => setState(() => _skippedPairing = false),
+                ),
         );
       },
     );
