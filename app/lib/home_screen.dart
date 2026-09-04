@@ -100,11 +100,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Row(
                 children: [
                   const Expanded(
-                    child: Text('Duet',
-                        style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w500,
-                            color: DuetColors.text)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Duet',
+                            style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w500,
+                                color: DuetColors.text)),
+                        SizedBox(width: 8),
+                        HeartAccent(size: 16),
+                      ],
+                    ),
                   ),
                   if (kBackendEnabled)
                     IconButton(
@@ -235,13 +242,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(),
-        backgroundColor: DuetColors.amber,
-        foregroundColor: DuetColors.amberInk,
-        icon: const Icon(Icons.add),
-        label: const Text('New alarm',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5)),
+      floatingActionButton: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        child: Ink(
+          decoration: const BoxDecoration(
+            gradient: DuetColors.wash,
+            borderRadius: BorderRadius.all(Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(color: Color(0x40F0A8C8), blurRadius: 20, offset: Offset(0, 8)),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28),
+            onTap: () => _edit(),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, color: DuetColors.amberInk, size: 18),
+                  SizedBox(width: 9),
+                  Text('New alarm',
+                      style: TextStyle(
+                          color: DuetColors.amberInk,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15.5)),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -382,6 +413,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   inactiveThumbColor: const Color(0xFF5A4C44),
                   inactiveTrackColor: const Color(0xFF2E2621),
                   trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                  thumbIcon: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
+                          ? const Icon(Icons.favorite_rounded,
+                              size: 14, color: DuetColors.amber)
+                          : null),
                   onChanged: (v) async {
                     await _repo.setEnabled(alarm.id, v);
                     if (mounted) setState(() {});

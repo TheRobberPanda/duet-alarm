@@ -24,11 +24,114 @@ class DuetColors {
   static const amberInk = Color(0xFF3D1526);
   static const teal = Color(0xFFC9AEE8);
   static const danger = Color(0xFFE87DA0);
+
+  /// The two accents as one diagonal wash -- gradient buttons, the sparkle
+  /// backdrop, anything that wants to say "girly" in one brushstroke rather
+  /// than a flat fill.
+  static const wash = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [amber, teal],
+  );
+}
+
+/// Paints behind every screen (see main.dart's [MaterialApp.builder]): a soft
+/// diagonal wash from the plum background up towards the two accents, plus a
+/// handful of blurred bokeh circles standing in for sparkle. Static, not
+/// animated -- this sits behind everything else including the ringing screen's
+/// eventual Flutter surfaces, and motion back there would upstage the actual
+/// alarm.
+class GirlyBackdrop extends StatelessWidget {
+  const GirlyBackdrop({super.key, required this.child});
+
+  final Widget child;
+
+  // Corners only, small and faint -- a hint of color peeking in rather than a
+  // wash sitting over the content. The first pass used huge blurred spreads
+  // that muddied every card; this is deliberately closer to "barely there".
+  static const _bokeh = [
+    (Alignment(-1.15, -1.1), 130.0, DuetColors.amber),
+    (Alignment(1.2, -1.15), 150.0, DuetColors.teal),
+    (Alignment(1.15, 1.2), 140.0, DuetColors.amber),
+  ];
+
+  // A few tiny fixed sparkle points -- actual twinkle rather than another
+  // blurred circle. Diamond, not a dot, so it reads as a spark at this size.
+  static const _sparkles = [
+    (Alignment(-0.72, -0.55), 7.0),
+    (Alignment(0.8, -0.2), 5.0),
+    (Alignment(-0.5, 0.62), 6.0),
+    (Alignment(0.65, 0.78), 5.0),
+    (Alignment(0.15, -0.78), 4.0),
+  ];
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [DuetColors.bgDeep, DuetColors.bg],
+          ),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            for (final (align, size, color) in _bokeh)
+              Align(
+                alignment: align,
+                child: Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0)],
+                    ),
+                  ),
+                ),
+              ),
+            for (final (align, size) in _sparkles)
+              Align(
+                alignment: align,
+                child: Transform.rotate(
+                  angle: 0.785398, // 45deg -- a square read as a diamond
+                  child: Container(
+                    width: size,
+                    height: size,
+                    decoration: BoxDecoration(
+                      color: DuetColors.text.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+              ),
+            child,
+          ],
+        ),
+      );
+}
+
+/// A small, quiet decoration -- never the point of a layout, just a wink that
+/// this is Duet. Kept to one glyph size so a row of them never competes with
+/// real content for attention.
+class HeartAccent extends StatelessWidget {
+  const HeartAccent({super.key, this.size = 14, this.color = DuetColors.amber});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) =>
+      Icon(Icons.favorite_rounded, size: size, color: color.withValues(alpha: 0.85));
 }
 
 ThemeData duetTheme() => ThemeData(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: DuetColors.bg,
+      // The gradient lives in GirlyBackdrop, painted once behind the whole app
+      // by MaterialApp.builder -- an opaque scaffold color here would hide it
+      // on every screen.
+      scaffoldBackgroundColor: Colors.transparent,
       colorScheme: const ColorScheme.dark(
         primary: DuetColors.amber,
         secondary: DuetColors.teal,
@@ -77,9 +180,16 @@ class DuetCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color ?? DuetColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: border != null ? Border.all(color: border!) : null,
+          color: (color ?? DuetColors.surface).withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: border ?? DuetColors.amber.withValues(alpha: 0.16)),
+          boxShadow: [
+            BoxShadow(
+              color: DuetColors.amber.withValues(alpha: 0.06),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: child,
       );
@@ -118,15 +228,41 @@ class _DuetButtonState extends State<DuetButton> {
     final button = SizedBox(
       height: 52,
       child: widget.filled
-          ? FilledButton(
-              onPressed: widget.busy ? null : widget.onTap,
-              style: FilledButton.styleFrom(
-                backgroundColor: DuetColors.amber,
-                foregroundColor: DuetColors.amberInk,
-                disabledBackgroundColor: DuetColors.amber,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          ? Opacity(
+              // FilledButton dims itself when disabled; a bespoke gradient
+              // pill has to do that by hand.
+              opacity: widget.onTap == null && !widget.busy ? 0.5 : 1,
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(15),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: DuetColors.wash,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x40F0A8C8),
+                        blurRadius: 18,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(15),
+                    onTap: widget.busy ? null : widget.onTap,
+                    child: Center(
+                      child: IconTheme.merge(
+                        data: const IconThemeData(color: DuetColors.amberInk),
+                        child: DefaultTextStyle.merge(
+                          style: const TextStyle(color: DuetColors.amberInk),
+                          child: child,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              child: child)
+            )
           : OutlinedButton(
               onPressed: widget.busy ? null : widget.onTap,
               style: OutlinedButton.styleFrom(

@@ -66,8 +66,15 @@ class _SignInScreenState extends State<SignInScreen> {
               const Spacer(),
               const Center(child: PairRing(size: 72)),
               const SizedBox(height: 28),
-              const Text('An alarm you share.',
-                  style: TextStyle(fontSize: 30, height: 1.1, color: DuetColors.text)),
+              const Row(
+                children: [
+                  Expanded(
+                    child: Text('An alarm you share.',
+                        style: TextStyle(fontSize: 30, height: 1.1, color: DuetColors.text)),
+                  ),
+                  HeartAccent(size: 22),
+                ],
+              ),
               const SizedBox(height: 10),
               const Text(
                 'Both phones ring. Either of you can turn it off.',

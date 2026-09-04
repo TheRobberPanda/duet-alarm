@@ -64,6 +64,10 @@ class DuetApp extends StatelessWidget {
         title: 'Duet',
         debugShowCheckedModeBanner: false,
         theme: duetTheme(),
+        // Painted once behind every screen, Navigator route changes included --
+        // ThemeData.scaffoldBackgroundColor is transparent precisely so this
+        // shows through instead of every screen needing its own backdrop.
+        builder: (context, child) => GirlyBackdrop(child: child ?? const SizedBox()),
         home: kBackendEnabled ? const AuthGate() : const HomeScreen(),
       );
 }

@@ -273,6 +273,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       inactiveThumbColor: const Color(0xFF5A4C50),
                       inactiveTrackColor: const Color(0xFF2E2129),
                       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                      thumbIcon: WidgetStateProperty.resolveWith((states) =>
+                          states.contains(WidgetState.selected)
+                              ? const Icon(Icons.favorite_rounded,
+                                  size: 14, color: DuetColors.amber)
+                              : null),
                       onChanged: _setAllowPartnerDismiss,
                     ),
                   ]),
