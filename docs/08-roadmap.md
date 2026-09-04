@@ -38,7 +38,20 @@ on two phones. Prove that before building anything pretty.
 - **A full re-theme to match the icon** -- pink and lavender in place of the
   original amber and teal, plus real motion throughout (a breathing pair
   ring, press feedback on buttons, staggered list entrances, cross-fades
-  between auth/pairing/home).
+  between auth/pairing/home, gradient day pills and sound-picker glow on
+  the editor screens).
+- **Milestone 4's "for both of us" dismiss, done and verified live**: a
+  long press on Dismiss calls the `act_on_partner` RPC (looks up the
+  partner's id via `pair_members`, respects their `allow_partner_dismiss`
+  toggle server-side). Still polling, not realtime/push.
+- **Themes, done as selectable skins**: four options (Classic, Blue, Fish,
+  Horse) in Settings, each with its own color and a distinct continuous
+  animation (heartbeat / drip / swim / trot). Picking one repaints your
+  half of every PairRing in the app via a shared color+skin notifier, and
+  shows as a small animated badge on rings big enough to hold one --
+  verified live on hardware, badges render at the right position and size.
+- **A rotating tip banner** on the home screen, loading-screen-hint style,
+  showing a live dismiss-count comparison between you and your partner.
 - Twelve-artboard design canvas; private GitHub repo.
 
 **Blocked on the outside world**
@@ -48,19 +61,17 @@ on two phones. Prove that before building anything pretty.
 
 **Not started**
 
-- The rest of Milestone 4: "for both of us" dismiss/snooze (needs the
-  partner's user id threaded to the ring path, not just their state --
-  deliberately not built blind without a device to verify a cross-device
-  dismiss actually does what it says), realtime/push instead of polling,
-  `allow_partner_dismiss` enforcement on that path.
-- Wake receipts, themes, missions, monetisation, store listing.
+- Realtime/push for the awareness strip and ring state (still polling
+  every 4s instead).
+- Wake receipts, missions, monetisation, store listing.
+- Per-skin animation on the ringing screen itself (skins currently animate
+  in Settings and as ring badges elsewhere in the app, not on the
+  full-screen ring while an alarm is actually going off).
 
 **The single most important outstanding item is still Milestone 0 test 14**
--- overnight, offline, in a drawer. Everything else is building on an
-assumption that has not yet been proven for a full night. Second most
-important: an actual device pass on everything built in this session's
-back half (the awareness strip and the settings screen), none of which has
-touched real hardware yet.
+-- overnight, offline, in a drawer. Everything else, including tonight's
+skins and dismiss-for-both work, is building on an assumption that has not
+yet been proven for a full night.
 
 ## Milestone 0 — Prove the alarm (Android only)
 
