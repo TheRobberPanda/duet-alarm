@@ -13,10 +13,16 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -50,6 +56,8 @@ class RingingActivity : Activity() {
     private var pairId: String? = null
     private var awarenessView: TextView? = null
     private val pollHandler = Handler(Looper.getMainLooper())
+    private var sensorManager: SensorManager? = null
+    private var proximityTriggered = false
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
 
@@ -74,6 +82,7 @@ class RingingActivity : Activity() {
         )
 
         startAwarenessPolling()
+        startProximityGesture()
     }
 
     /**
@@ -111,12 +120,66 @@ class RingingActivity : Activity() {
         view.visibility = if (text == null) View.GONE else View.VISIBLE
     }
 
+    /**
+     * Wave-to-snooze: covering the top of the phone snoozes it without needing
+     * to look at or unlock the screen. Only armed when a snooze is actually
+     * available -- a wave over a phone with none left would do nothing, which
+     * is worse than the gesture not existing at all. [proximityTriggered]
+     * fires it once per ring rather than once per "near" reading, since the
+     * sensor stays near for as long as a hand or a pocket covers it.
+     */
+    private fun startProximityGesture() {
+        if (snoozesLeft <= 0) return
+        val sm = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_PROXIMITY) ?: return
+        sensorManager = sm
+        sm.registerListener(proximityListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    private val proximityListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (proximityTriggered) return
+            val near = event.values.isNotEmpty() && event.values[0] < event.sensor.maximumRange
+            if (near) {
+                proximityTriggered = true
+                vibrateConfirm()
+                runOnUiThread { snooze() }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
+    /** The one bit of feedback a gesture needs when the screen is about to
+     *  close anyway -- there is no time for a visual confirmation to register. */
+    private fun vibrateConfirm() {
+        @Suppress("DEPRECATION")
+        val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        v?.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+
+    /**
+     * "For both of us" -- ADR-006's deliberate secondary action, reached by a
+     * long press rather than a second button so it cannot be hit by accident.
+     * Stops your own alarm too: dismissing for both while yours kept ringing
+     * would be a confusing halfway state.
+     */
+    private fun dismissForBoth() {
+        val id = alarmId ?: return
+        val base = id.removePrefix(AlarmDef.SNOOZE_PREFIX)
+        val (alarm, firedAt) = splitFireId(base) ?: return dismiss()
+        vibrateConfirm()
+        RingSync.actOnPartner(this, alarm, firedAt, pairId, "dismiss") { }
+        dismiss()
+    }
+
     private val ringEnded = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) = finishRinging()
     }
 
     override fun onDestroy() {
         pollHandler.removeCallbacksAndMessages(null)
+        sensorManager?.unregisterListener(proximityListener)
         runCatching { unregisterReceiver(ringEnded) }
         super.onDestroy()
     }
@@ -209,8 +272,8 @@ class RingingActivity : Activity() {
 
         // ── Controls ─────────────────────────────────────────────────────────
         // These stop YOUR phone only. The "for both of us" variants belong here
-        // too (docs/01), deliberately smaller and behind a long press -- but they
-        // are omitted until pairing exists rather than shipped as dead buttons.
+        // too (docs/01) -- reached by a LONG PRESS on Dismiss rather than a
+        // second button, so it cannot be hit by accident (ADR-006).
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
         if (snoozesLeft > 0) {
@@ -220,7 +283,12 @@ class RingingActivity : Activity() {
             )
         }
         controls.addView(
-            actionButton("Dismiss", "#F0A8C8", "#3D1526", outlined = false) { dismiss() },
+            actionButton("Dismiss", "#F0A8C8", "#3D1526", outlined = false) { dismiss() }
+                .apply {
+                    if (pairId != null) {
+                        setOnLongClickListener { dismissForBoth(); true }
+                    }
+                },
             LinearLayout.LayoutParams(0, dp(72)).apply {
                 weight = 1f
                 if (snoozesLeft > 0) leftMargin = dp(6)
@@ -229,16 +297,20 @@ class RingingActivity : Activity() {
         root.addView(controls, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         root.addView(TextView(this).apply {
-            text = when {
-                maxSnoozes == 0 -> "Snooze is off for this alarm"
-                snoozesLeft == 0 -> "No snoozes left — time to get up"
-                snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
-                else -> "Snooze lasts $snoozeMinutes min"
-            }
+            text = listOfNotNull(
+                when {
+                    maxSnoozes == 0 -> "Snooze is off for this alarm"
+                    snoozesLeft == 0 -> "No snoozes left — time to get up"
+                    snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
+                    else -> "Snooze lasts $snoozeMinutes min"
+                },
+                "wave over the top to snooze".takeIf { snoozesLeft > 0 },
+                "hold Dismiss to end it for both".takeIf { pairId != null },
+            ).joinToString(" · ")
             setTextColor(Color.parseColor("#776273"))
             textSize = 13f
             gravity = Gravity.CENTER
-            setPadding(0, dp(14), 0, 0)
+            setPadding(dp(20), dp(14), dp(20), 0)
         })
 
         return root

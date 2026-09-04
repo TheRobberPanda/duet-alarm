@@ -92,6 +92,49 @@ object RingSync {
         }.start()
     }
 
+    /**
+     * "For both of us" (docs/01, ADR-006's deliberate secondary action): acts on
+     * the PARTNER's participant row via the `act_on_partner` RPC, which is the
+     * only path that can -- it checks their `allow_partner_dismiss` preference
+     * server-side, which a direct client write to their row cannot be trusted
+     * to respect. No-ops harmlessly if their ring session has not started yet
+     * (nothing to update) or they have that preference off (the RPC rejects
+     * it); either way [callback] just reports whether it thinks it worked.
+     */
+    fun actOnPartner(
+        ctx: Context, alarmId: String, firedAtUtc: Long, pairId: String?, action: String,
+        callback: (Boolean) -> Unit
+    ) {
+        if (pairId == null) return callback(false)
+        val token = AuthStore.accessToken(ctx)
+        val uid = AuthStore.userId(ctx)
+        if (token == null || uid == null) return callback(false)
+
+        Thread {
+            val ok = try {
+                val partnerId = fetchPartnerId(token, pairId, uid)
+                if (partnerId == null) {
+                    false
+                } else {
+                    val session = sessionId(alarmId, firedAtUtc)
+                    val body =
+                        """{"p_session":"$session","p_target":"$partnerId","p_action":"$action"}"""
+                    postForSuccess(token, "$URL_BASE/rpc/act_on_partner", body)
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "act on partner failed (non-fatal)", t)
+                false
+            }
+            callback(ok)
+        }.start()
+    }
+
+    private fun fetchPartnerId(token: String, pairId: String, myUid: String): String? {
+        val url = "$URL_BASE/pair_members?pair_id=eq.$pairId&user_id=neq.$myUid&select=user_id&limit=1"
+        val arr = JSONArray(get(token, url))
+        return if (arr.length() == 0) null else arr.getJSONObject(0).optString("user_id", null)
+    }
+
     /** Deterministic, so both phones ringing the same shared alarm agree on the
      *  session id without either having to create it first. */
     private fun sessionId(alarmId: String, firedAtUtc: Long): String =
@@ -126,6 +169,28 @@ object RingSync {
                 return "[]"
             }
             return conn.inputStream.bufferedReader().readText()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun postForSuccess(token: String, url: String, body: String): Boolean {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.setRequestProperty("apikey", ANON_KEY)
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.outputStream.use { it.write(body.toByteArray()) }
+            val code = conn.responseCode
+            if (code >= 400) {
+                Log.w(TAG, "POST $url -> $code: ${conn.errorStream?.bufferedReader()?.readText()}")
+                return false
+            }
+            return true
         } finally {
             conn.disconnect()
         }
