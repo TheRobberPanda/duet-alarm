@@ -6,6 +6,8 @@ import 'alarm.dart';
 import 'alarm_editor_screen.dart';
 import 'alarm_repository.dart';
 import 'diagnostics_screen.dart';
+import 'main.dart' show kBackendEnabled;
+import 'settings_screen.dart';
 import 'theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -104,6 +106,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             fontWeight: FontWeight.w500,
                             color: DuetColors.text)),
                   ),
+                  if (kBackendEnabled)
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined,
+                          color: DuetColors.dim, size: 22),
+                      tooltip: 'Settings',
+                      onPressed: () => Navigator.of(context).push(
+                        DuetPageRoute(
+                          builder: (_) => SettingsScreen(
+                            onSignedOut: () => Navigator.of(context)
+                                .popUntil((route) => route.isFirst),
+                          ),
+                        ),
+                      ),
+                    ),
                   IconButton(
                     icon: const Icon(Icons.health_and_safety_outlined,
                         color: DuetColors.dim, size: 22),
