@@ -15,6 +15,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -46,6 +48,8 @@ class RingingActivity : Activity() {
     private var soundRef = "default"
     private var label = "Alarm"
     private var pairId: String? = null
+    private var awarenessView: TextView? = null
+    private val pollHandler = Handler(Looper.getMainLooper())
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
 
@@ -68,6 +72,43 @@ class RingingActivity : Activity() {
             this, ringEnded, IntentFilter(AlarmActions.ACTION_RING_ENDED),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
+
+        startAwarenessPolling()
+    }
+
+    /**
+     * Milestone 4's live awareness strip -- "Sam snoozed", "Sam is ringing too" --
+     * polled rather than pushed: this screen has no Flutter engine and no
+     * realtime channel, just RingSync's plain REST calls. A few seconds of
+     * staleness on a strip that is itself a nice-to-have is a fine trade for not
+     * building a socket connection into the one screen that must never hang.
+     */
+    private fun startAwarenessPolling() {
+        val id = alarmId ?: return
+        if (pairId == null) return
+        val (base, firedAt) = splitFireId(id.removePrefix(AlarmDef.SNOOZE_PREFIX)) ?: return
+
+        val poll = object : Runnable {
+            override fun run() {
+                RingSync.fetchPartnerState(this@RingingActivity, base, firedAt, pairId) { state ->
+                    runOnUiThread { showAwareness(state) }
+                }
+                pollHandler.postDelayed(this, 4000)
+            }
+        }
+        pollHandler.post(poll)
+    }
+
+    private fun showAwareness(state: String?) {
+        val view = awarenessView ?: return
+        val text = when (state) {
+            "ringing" -> "They're ringing too"
+            "snoozed" -> "They snoozed"
+            "dismissed" -> "They're up"
+            else -> null // no row yet, or the request failed -- say nothing rather than guess
+        }
+        view.text = text ?: ""
+        view.visibility = if (text == null) View.GONE else View.VISIBLE
     }
 
     private val ringEnded = object : BroadcastReceiver() {
@@ -75,6 +116,7 @@ class RingingActivity : Activity() {
     }
 
     override fun onDestroy() {
+        pollHandler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(ringEnded) }
         super.onDestroy()
     }
@@ -150,6 +192,19 @@ class RingingActivity : Activity() {
 
         root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(dial, LinearLayout.LayoutParams(dp(268), dp(268)))
+
+        // Milestone 4's live awareness strip. Empty and GONE until polling finds
+        // a partner row to report -- see startAwarenessPolling().
+        awarenessView = TextView(this).apply {
+            setTextColor(Color.parseColor("#C9AEE8"))
+            textSize = 14f
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+        }
+        root.addView(awarenessView, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+            topMargin = dp(18)
+        })
+
         root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
 
         // ── Controls ─────────────────────────────────────────────────────────

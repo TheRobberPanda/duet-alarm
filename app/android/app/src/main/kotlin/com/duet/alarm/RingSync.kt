@@ -2,6 +2,7 @@ package com.duet.alarm
 
 import android.content.Context
 import android.util.Log
+import org.json.JSONArray
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
@@ -55,6 +56,42 @@ object RingSync {
         }
     }
 
+    /**
+     * The one read this object does. Polled from the ringing screen (Milestone
+     * 4's live awareness strip) to show what the partner did, if anything --
+     * `null` covers every reason there is nothing to show yet: no partner row
+     * (their phone has not started ringing), no credentials, or a failed
+     * request. The caller cannot and should not tell those apart; the strip
+     * just stays hidden.
+     *
+     * [callback] runs on the same background thread as the request, same as
+     * every other entry point here -- the caller hops back to the main thread
+     * itself.
+     */
+    fun fetchPartnerState(
+        ctx: Context, alarmId: String, firedAtUtc: Long, pairId: String?, callback: (String?) -> Unit
+    ) {
+        if (pairId == null) return callback(null)
+        val token = AuthStore.accessToken(ctx)
+        val uid = AuthStore.userId(ctx)
+        if (token == null || uid == null) return callback(null)
+
+        Thread {
+            val state = try {
+                val session = sessionId(alarmId, firedAtUtc)
+                val url = "$URL_BASE/ring_participants" +
+                    "?session_id=eq.$session&user_id=neq.$uid&select=state&limit=1"
+                val body = get(token, url)
+                val arr = JSONArray(body)
+                if (arr.length() == 0) null else arr.getJSONObject(0).optString("state", null)
+            } catch (t: Throwable) {
+                Log.w(TAG, "fetch partner state failed (non-fatal)", t)
+                null
+            }
+            callback(state)
+        }.start()
+    }
+
     /** Deterministic, so both phones ringing the same shared alarm agree on the
      *  session id without either having to create it first. */
     private fun sessionId(alarmId: String, firedAtUtc: Long): String =
@@ -73,6 +110,25 @@ object RingSync {
                 Log.w(TAG, "ring sync failed (non-fatal)", t)
             }
         }.start()
+    }
+
+    private fun get(token: String, url: String): String {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("apikey", ANON_KEY)
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            val code = conn.responseCode
+            if (code >= 400) {
+                Log.w(TAG, "GET $url -> $code: ${conn.errorStream?.bufferedReader()?.readText()}")
+                return "[]"
+            }
+            return conn.inputStream.bufferedReader().readText()
+        } finally {
+            conn.disconnect()
+        }
     }
 
     private fun post(token: String, url: String, body: String) =
