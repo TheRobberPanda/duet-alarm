@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// The palette, re-themed to match the app icon (docs/08): a warm, near-black
@@ -371,6 +373,68 @@ const duetSkins = [
 DuetSkin skinFor(String? id) =>
     duetSkins.firstWhere((s) => s.id == id, orElse: () => duetSkins.first);
 
+/// A skin's icon, animated with a small motion of its own -- a heartbeat for
+/// Classic, a drip for Blue, a swim wag for Fish, a trot bounce for Horse.
+/// Deliberately tiny and continuous rather than triggered: this plays in a
+/// theme-picker swatch, not the ringing screen, so it can run forever without
+/// competing for attention anywhere that matters.
+class AnimatedSkinIcon extends StatefulWidget {
+  const AnimatedSkinIcon({super.key, required this.skin, this.size = 22, this.color});
+
+  final DuetSkin skin;
+  final double size;
+  final Color? color;
+
+  @override
+  State<AnimatedSkinIcon> createState() => _AnimatedSkinIconState();
+}
+
+class _AnimatedSkinIconState extends State<AnimatedSkinIcon>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = Icon(widget.skin.icon, size: widget.size, color: widget.color);
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        switch (widget.skin.id) {
+          case 'teal': // heartbeat
+            final beat = (t < 0.2 ? (t / 0.2) : (t < 0.4 ? 1 - (t - 0.2) / 0.2 : 0));
+            return Transform.scale(scale: 1 + beat * 0.22, child: child);
+          case 'blue': // drip -- a small vertical bob
+            return Transform.translate(
+              offset: Offset(0, math.sin(t * 2 * math.pi) * 2.5),
+              child: child,
+            );
+          case 'fish': // swim wag -- side-to-side rotation
+            return Transform.rotate(
+              angle: math.sin(t * 2 * math.pi) * 0.24,
+              child: child,
+            );
+          case 'horse': // trot -- a quick vertical bounce
+            final bounce = (math.sin(t * 2 * math.pi * 2)).abs();
+            return Transform.translate(offset: Offset(0, -bounce * 3), child: child);
+          default:
+            return child!;
+        }
+      },
+      child: icon,
+    );
+  }
+}
+
 /// The two ring colors currently in effect, one per person. A tiny global
 /// notifier rather than a constructor param on every [PairRing] -- the ring
 /// appears in ~15 places across the app, and a skin choice has to reach every
@@ -386,23 +450,30 @@ class SkinColors extends ChangeNotifier {
   // "mine" paints the right half (the "you" arc, historically teal); "partner"
   // paints the left half (the "them" arc, historically amber/pink). Matching
   // _PairRingPainter's existing convention below, not swapping it.
-  Color mine = DuetColors.teal;
-  Color partner = DuetColors.amber;
+  //
+  // mineSkin always resolves to a real skin (Classic by default). partnerSkin
+  // is null whenever there is nothing distinct to show -- unset, or sitting on
+  // the same never-picked db default as mine -- in which case the ring falls
+  // back to the classic partner color with no animated badge, exactly as it
+  // always looked before skins existed.
+  DuetSkin mineSkin = duetSkins.first;
+  DuetSkin? partnerSkin;
+
+  Color get mine => mineSkin.color;
+  Color get partner => partnerSkin?.color ?? DuetColors.amber;
 
   /// Either argument left null means "leave that side as it is" -- NOT
   /// "reset to default". The settings screen relies on this to update only
   /// its own side without clobbering whatever the partner's was last read as.
   void setSkins({String? mine, String? partner}) {
-    final newMine = mine != null ? skinFor(mine).color : this.mine;
-    var newPartner = partner != null ? skinFor(partner).color : this.partner;
-    // Both sides still sitting on the same never-picked default ('teal', the
-    // db column's original placeholder before skins existed) would otherwise
-    // paint one solid ring instead of the two-tone signature. Fall back to the
-    // classic partner color until the two actually diverge by real choice.
-    if (newPartner == newMine) newPartner = DuetColors.amber;
-    if (newMine == this.mine && newPartner == this.partner) return;
-    this.mine = newMine;
-    this.partner = newPartner;
+    final newMineSkin = mine != null ? skinFor(mine) : mineSkin;
+    var newPartnerSkin = partner != null ? skinFor(partner) : partnerSkin;
+    if (newPartnerSkin != null && newPartnerSkin.color == newMineSkin.color) {
+      newPartnerSkin = null;
+    }
+    if (newMineSkin == mineSkin && newPartnerSkin == partnerSkin) return;
+    mineSkin = newMineSkin;
+    partnerSkin = newPartnerSkin;
     notifyListeners();
   }
 }
@@ -442,6 +513,11 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  /// Below this the ring itself is too small for a badge to read as anything
+  /// but a smudge -- most list-row uses (26-34px) skip it; the bigger
+  /// sign-in/home/next-alarm rings (52px+) are where a skin actually shows.
+  static const _badgeMinRingSize = 48.0;
+
   @override
   Widget build(BuildContext context) {
     // Rebuilds whenever a skin changes anywhere in the app, on top of this
@@ -450,6 +526,10 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
     return AnimatedBuilder(
       animation: Listenable.merge([_controller, SkinColors.instance]),
       builder: (context, child) {
+        final skins = SkinColors.instance;
+        final r = (widget.size - widget.strokeWidth) / 2;
+        final badge = (widget.size * 0.34).clamp(16.0, 26.0);
+
         final ring = SizedBox(
           // CustomPaint only honours `size` when it is otherwise unconstrained
           // -- inside a stretching Column it would expand to the full width
@@ -457,14 +537,25 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
           // way.
           width: widget.size,
           height: widget.size,
-          child: CustomPaint(
-            size: Size(widget.size, widget.size),
-            painter: _PairRingPainter(
-              hasPartner: widget.hasPartner,
-              strokeWidth: widget.strokeWidth,
-              mine: SkinColors.instance.mine,
-              partner: SkinColors.instance.partner,
-            ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CustomPaint(
+                size: Size(widget.size, widget.size),
+                painter: _PairRingPainter(
+                  hasPartner: widget.hasPartner,
+                  strokeWidth: widget.strokeWidth,
+                  mine: skins.mine,
+                  partner: skins.partner,
+                ),
+              ),
+              if (widget.size >= _badgeMinRingSize) ...[
+                _skinBadge(skins.mineSkin, badge, left: widget.size / 2 + r - badge / 2),
+                if (widget.hasPartner && skins.partnerSkin != null)
+                  _skinBadge(skins.partnerSkin!, badge,
+                      left: widget.size / 2 - r - badge / 2),
+              ],
+            ],
           ),
         );
         if (!widget.animate) return ring;
@@ -472,6 +563,23 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
       },
     );
   }
+
+  Widget _skinBadge(DuetSkin skin, double badge, {required double left}) => Positioned(
+        left: left,
+        top: widget.size / 2 - badge / 2,
+        child: Container(
+          width: badge,
+          height: badge,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: DuetColors.bgDeep,
+            border: Border.all(color: skin.color, width: 1.4),
+          ),
+          child: Center(
+            child: AnimatedSkinIcon(skin: skin, size: badge * 0.56, color: skin.color),
+          ),
+        ),
+      );
 }
 
 class _PairRingPainter extends CustomPainter {

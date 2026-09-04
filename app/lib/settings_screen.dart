@@ -329,11 +329,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ? [BoxShadow(color: skin.color.withValues(alpha: 0.5), blurRadius: 14)]
                                   : null,
                             ),
-                            child: Icon(skin.icon,
+                            child: Center(
+                              child: AnimatedSkinIcon(
+                                skin: skin,
                                 size: 22,
                                 color: on
                                     ? DuetColors.amberInk
-                                    : DuetColors.text.withValues(alpha: 0.6)),
+                                    : DuetColors.text.withValues(alpha: 0.6),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(skin.label,
