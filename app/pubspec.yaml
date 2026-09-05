@@ -59,6 +59,17 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # The display face, and the app's only bundled font. Montserrat's geometric,
+  # near-circular counters rhyme with the pair ring, which is the whole visual
+  # idea -- so it earns its place on the one thing it is used for: the time.
+  # Everything else stays on the device's own sans (see theme.dart), which
+  # costs nothing and looks native. SIL Open Font License 1.1.
+  fonts:
+    - family: Duet Display
+      fonts:
+        - asset: assets/fonts/Montserrat-ExtraBold.ttf
+          weight: 800
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

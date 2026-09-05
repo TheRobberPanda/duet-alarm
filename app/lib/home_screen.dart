@@ -287,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(22),
                       onTap: () => _edit(next.alarm),
-                      child: _nextCard(next.alarm, next.at),
+                      child: _dial(next.alarm, next.at),
                     ),
                   ),
                 ),
@@ -354,66 +354,80 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _nextCard(Alarm alarm, DateTime at) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF251E19), Color(0xFF1C1613)],
-          ),
-          border: Border.all(color: DuetColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  /// THE DIAL -- the screen's hero and the app's signature.
+  ///
+  /// The ring was already the one element carrying real information (two
+  /// halves, each lit only if that person has this alarm on) and it was sitting
+  /// in the corner of a card as decoration. Here it is the object itself, with
+  /// the time set inside it like a clock face, because that is what this
+  /// product is: a dial the two of you share. Everything below it is
+  /// deliberately quieter so this reads first.
+  Widget _dial(Alarm alarm, DateTime at) {
+    final subtitle = alarm.label.isEmpty
+        ? alarm.scheduleLabel
+        : '${alarm.label} · ${alarm.scheduleLabel}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 268,
+            height: 268,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionLabel('Next alarm'),
-                      const SizedBox(height: 8),
-                      Text(alarm.timeLabel,
-                          style: const TextStyle(
-                              fontSize: 52,
-                              height: 1.05,
-                              fontWeight: FontWeight.w200,
-                              letterSpacing: 1,
-                              color: DuetColors.text)),
-                      const SizedBox(height: 4),
-                      Text(
-                        alarm.label.isEmpty
-                            ? alarm.scheduleLabel
-                            : '${alarm.label} · ${alarm.scheduleLabel}',
-                        style: const TextStyle(fontSize: 14.5, color: DuetColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
                 PairRing(
-                  size: 84,
+                  size: 268,
+                  strokeWidth: 5,
                   mineOn: alarm.enabled,
                   hasPartner: alarm.partnerEnabled &&
                       alarm.ringTarget != RingTarget.owner,
                 ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SectionLabel('Next alarm'),
+                    const SizedBox(height: 10),
+                    // The one place the display face appears. Montserrat's
+                    // circular counters echo the ring it sits inside.
+                    Text(
+                      alarm.timeLabel,
+                      style: const TextStyle(
+                        fontFamily: 'Duet Display',
+                        fontSize: 58,
+                        height: 1,
+                        letterSpacing: -1.5,
+                        color: DuetColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 168),
+                      child: Text(
+                        subtitle,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13, color: DuetColors.muted, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            Container(height: 1, color: const Color(0xFF2B231E)),
-            const SizedBox(height: 13),
-            Row(children: [
-              const Icon(Icons.schedule, size: 15, color: DuetColors.dim),
-              const SizedBox(width: 7),
-              Text('Rings ${_until(at)}',
-                  style: const TextStyle(fontSize: 13.5, color: DuetColors.muted)),
-            ]),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Rings ${_until(at)}',
+            style: const TextStyle(
+                fontSize: 14, color: DuetColors.dim, letterSpacing: 0.2),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _emptyState() => Padding(
         // Roughly optical centre of the remaining space, allowing for the FAB.
@@ -447,8 +461,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           borderRadius: BorderRadius.circular(16),
           onTap: () => _edit(alarm),
           child: Opacity(
-            opacity: alarm.enabled ? 1 : 0.5,
-            child: DuetCard(
+            opacity: alarm.enabled ? 1 : 0.45,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: DuetColors.surface.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(18),
+              ),
               child: Row(children: [
                 PairRing(
                   size: 26,
