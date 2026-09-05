@@ -124,8 +124,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: DuetColors.amber)),
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: SkinColors.instance.accent)),
       );
     }
 
@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _load,
-          color: DuetColors.amber,
+          color: SkinColors.instance.accent,
           backgroundColor: DuetColors.surface,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 110),
@@ -237,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   final tip = tips[_tipIndex % tips.length];
                   return DuetCard(
                     child: Row(children: [
-                      const Icon(Icons.auto_awesome, size: 15, color: DuetColors.amber),
+                      Icon(Icons.auto_awesome, size: 15, color: SkinColors.instance.accent),
                       const SizedBox(width: 10),
                       Expanded(
                         child: AnimatedSwitcher(
@@ -261,10 +261,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
               if (_repo.sync != null && !_repo.lastSyncOk) ...[
                 DuetCard(
-                  border: DuetColors.amber.withValues(alpha: 0.5),
+                  border: SkinColors.instance.accent.withValues(alpha: 0.5),
                   child: Row(children: [
-                    const Icon(Icons.cloud_off_outlined,
-                        color: DuetColors.amber, size: 20),
+                    Icon(Icons.cloud_off_outlined,
+                        color: SkinColors.instance.accent, size: 20),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(

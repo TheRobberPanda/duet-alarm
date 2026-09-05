@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'alarm_engine.dart';
 import 'pair_repository.dart';
 import 'theme.dart';
 
@@ -92,6 +93,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // and this screen shouldn't feel like it's waiting on the network to
     // show you your own choice.
     SkinColors.instance.setSkins(mine: skinId, partner: null);
+    // Keep the native ringing screen in step with the choice just made.
+    AlarmEngine.setSkinColors(
+      SkinColors.instance.mine.toARGB32(),
+      SkinColors.instance.partner.toARGB32(),
+    );
     setState(() => _profile = _profile == null
         ? null
         : Profile(
@@ -171,7 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
               child: Text(confirmLabel,
-                  style: TextStyle(color: danger ? DuetColors.danger : DuetColors.amber)),
+                  style: TextStyle(color: danger ? DuetColors.danger : SkinColors.instance.accent)),
             ),
           ],
         ),
@@ -180,8 +186,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: DuetColors.amber)),
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: SkinColors.instance.accent)),
       );
     }
 
@@ -220,14 +226,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   if (_savingName)
-                    const SizedBox(
+                    SizedBox(
                       width: 18, height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: DuetColors.amber),
+                          strokeWidth: 2, color: SkinColors.instance.accent),
                     )
                   else
                     IconButton(
-                      icon: const Icon(Icons.check, color: DuetColors.amber, size: 20),
+                      icon: Icon(Icons.check, color: SkinColors.instance.accent, size: 20),
                       onPressed: _saveName,
                       tooltip: 'Save',
                     ),

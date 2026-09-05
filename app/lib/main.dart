@@ -136,6 +136,12 @@ class _PairGateState extends State<PairGate> {
         // this only runs on sign-in/pairing changes, not on every rebuild.
         final me = await _repo.myProfile();
         SkinColors.instance.setSkins(mine: me?.accent, partner: pair?.partner?.accent);
+        // The ringing screen is plain Android views with no Flutter engine, so
+        // it cannot read SkinColors -- the two colors have to be pushed to it.
+        await AlarmEngine.setSkinColors(
+          SkinColors.instance.mine.toARGB32(),
+          SkinColors.instance.partner.toARGB32(),
+        );
         // And the native side gets what the LAN fast path needs to sign and
         // authorise datagrams while the app itself is not running.
         await AlarmEngine.setPairContext(
@@ -154,8 +160,8 @@ class _PairGateState extends State<PairGate> {
       future: _pair,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: DuetColors.amber)),
+          return Scaffold(
+            body: Center(child: CircularProgressIndicator(color: SkinColors.instance.accent)),
           );
         }
         final pair = snap.data;

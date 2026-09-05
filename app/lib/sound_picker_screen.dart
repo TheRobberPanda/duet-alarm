@@ -68,14 +68,14 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
               AlarmEngine.stopPreview();
               Navigator.of(context).pop(_selected);
             },
-            child: const Text('Done',
+            child: Text('Done',
                 style: TextStyle(
-                    color: DuetColors.amber, fontWeight: FontWeight.w600, fontSize: 16)),
+                    color: SkinColors.instance.accent, fontWeight: FontWeight.w600, fontSize: 16)),
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: DuetColors.amber))
+          ? Center(child: CircularProgressIndicator(color: SkinColors.instance.accent))
           : ListView(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 40),
               children: [
@@ -101,11 +101,11 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                         color: const Color(0xFF2F2519),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text('LATER',
+                      child: Text('LATER',
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: DuetColors.amber)),
+                              color: SkinColors.instance.accent)),
                     ),
                   ]),
                 ),
@@ -131,7 +131,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
               color: chosen ? DuetColors.surfaceRaised : DuetColors.surface,
               borderRadius: BorderRadius.circular(15),
               border: Border.all(
-                  color: chosen ? DuetColors.amber : Colors.transparent, width: 1.4),
+                  color: chosen ? SkinColors.instance.accent : Colors.transparent, width: 1.4),
               boxShadow: chosen
                   ? const [BoxShadow(color: Color(0x30F0A8C8), blurRadius: 14)]
                   : null,
@@ -140,7 +140,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
               Icon(
                 _playing == s.ref ? Icons.graphic_eq : Icons.play_arrow,
                 size: 18,
-                color: chosen ? DuetColors.amber : DuetColors.dim,
+                color: chosen ? SkinColors.instance.accent : DuetColors.dim,
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -153,7 +153,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                 ),
               ),
               if (chosen)
-                const Icon(Icons.favorite_rounded, size: 17, color: DuetColors.amber),
+                Icon(Icons.favorite_rounded, size: 17, color: SkinColors.instance.accent),
             ]),
           ),
         ),

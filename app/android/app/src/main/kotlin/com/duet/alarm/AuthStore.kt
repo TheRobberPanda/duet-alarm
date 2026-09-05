@@ -25,6 +25,8 @@ object AuthStore {
     private const val KEY_PAIR = "pair_id"
     private const val KEY_LAN_SECRET = "lan_secret"
     private const val KEY_ALLOW_PARTNER_DISMISS = "allow_partner_dismiss"
+    private const val KEY_SKIN_MINE = "skin_mine"
+    private const val KEY_SKIN_PARTNER = "skin_partner"
 
     private fun prefs(ctx: Context) =
         ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -53,6 +55,25 @@ object AuthStore {
             .putBoolean(KEY_ALLOW_PARTNER_DISMISS, allowPartnerDismiss)
             .apply()
     }
+
+    /**
+     * The two ring colors, as ARGB ints, so the ringing screen can wear the
+     * skins you picked. Pushed from Dart because that is where the choice
+     * lives (theme.dart's SkinColors); 0 means "never set", and the ringing
+     * screen keeps its built-in defaults.
+     */
+    fun setSkinColors(ctx: Context, mine: Int, partner: Int) {
+        prefs(ctx).edit()
+            .putInt(KEY_SKIN_MINE, mine)
+            .putInt(KEY_SKIN_PARTNER, partner)
+            .apply()
+    }
+
+    fun skinMine(ctx: Context, fallback: Int): Int =
+        prefs(ctx).getInt(KEY_SKIN_MINE, 0).takeIf { it != 0 } ?: fallback
+
+    fun skinPartner(ctx: Context, fallback: Int): Int =
+        prefs(ctx).getInt(KEY_SKIN_PARTNER, 0).takeIf { it != 0 } ?: fallback
 
     fun accessToken(ctx: Context): String? = prefs(ctx).getString(KEY_TOKEN, null)
     fun userId(ctx: Context): String? = prefs(ctx).getString(KEY_USER, null)

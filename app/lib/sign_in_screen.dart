@@ -162,7 +162,7 @@ class _SignInScreenState extends State<SignInScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: DuetColors.amber),
+          borderSide: BorderSide(color: SkinColors.instance.accent),
         ),
       );
 }

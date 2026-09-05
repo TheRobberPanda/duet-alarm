@@ -124,7 +124,7 @@ class _PairScreenState extends State<PairScreen> {
                       : () => setState(() { _entering = !_entering; _error = null; }),
                   child: Text(
                     _entering ? 'Show my code instead' : 'Enter their code instead',
-                    style: const TextStyle(color: DuetColors.amber, fontSize: 15),
+                    style: TextStyle(color: SkinColors.instance.accent, fontSize: 15),
                   ),
                 ),
               ),
@@ -158,10 +158,10 @@ class _PairScreenState extends State<PairScreen> {
             const SectionLabel('Your invite code'),
             const SizedBox(height: 18),
             if (code == null)
-              const SizedBox(
+              SizedBox(
                 height: 60,
                 child: Center(
-                    child: CircularProgressIndicator(color: DuetColors.amber)),
+                    child: CircularProgressIndicator(color: SkinColors.instance.accent)),
               )
             else
               // Expanded, not fixed-width: six 44px cells plus margins overflow a
@@ -262,7 +262,7 @@ class _PairScreenState extends State<PairScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: DuetColors.amber),
+              borderSide: BorderSide(color: SkinColors.instance.accent),
             ),
           ),
         ),

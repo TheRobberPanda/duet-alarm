@@ -107,6 +107,17 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
 
+                    // So the ringing screen -- plain Android views, no Flutter
+                    // engine -- can wear the same skins as the rest of the app.
+                    "setSkinColors" -> {
+                        AuthStore.setSkinColors(
+                            this,
+                            call.argument<Number>("mine")?.toInt() ?: 0,
+                            call.argument<Number>("partner")?.toInt() ?: 0
+                        )
+                        result.success(null)
+                    }
+
                     // The pair context LanSync signs and authorises with. Nulls
                     // clear it, which is what leaving a pair or signing out does.
                     "setPairContext" -> {

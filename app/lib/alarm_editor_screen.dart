@@ -77,8 +77,8 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
       initialTime: TimeOfDay(hour: _hour, minute: _minute),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: DuetColors.amber,
+          colorScheme: ColorScheme.dark(
+            primary: SkinColors.instance.accent,
             onPrimary: DuetColors.amberInk,
             surface: DuetColors.surface,
           ),
@@ -156,9 +156,9 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text('Save',
+            child: Text('Save',
                 style: TextStyle(
-                    color: DuetColors.amber, fontWeight: FontWeight.w600, fontSize: 16)),
+                    color: SkinColors.instance.accent, fontWeight: FontWeight.w600, fontSize: 16)),
           ),
         ],
       ),
@@ -440,7 +440,7 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           alignment: Alignment.center,
           child: Icon(icon,
               size: 18,
-              color: onTap == null ? DuetColors.faint : DuetColors.amber),
+              color: onTap == null ? DuetColors.faint : SkinColors.instance.accent),
         ),
       );
 }

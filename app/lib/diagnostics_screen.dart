@@ -64,7 +64,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        color: DuetColors.amber,
+        color: SkinColors.instance.accent,
         backgroundColor: DuetColors.surface,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 40),
@@ -82,14 +82,14 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
             else ...[
               DuetCard(
                 border: h.problemCount > 0
-                    ? DuetColors.amber.withValues(alpha: 0.5)
+                    ? SkinColors.instance.accent.withValues(alpha: 0.5)
                     : null,
                 child: Row(children: [
                   Icon(
                     h.problemCount > 0
                         ? Icons.warning_amber_rounded
                         : Icons.check_circle_outline,
-                    color: h.problemCount > 0 ? DuetColors.amber : DuetColors.teal,
+                    color: h.problemCount > 0 ? SkinColors.instance.accent : DuetColors.teal,
                     size: 26,
                   ),
                   const SizedBox(width: 13),
@@ -117,7 +117,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               if (h.isAggressiveOem) ...[
                 const SizedBox(height: 8),
                 DuetCard(
-                  border: DuetColors.amber.withValues(alpha: 0.35),
+                  border: SkinColors.instance.accent.withValues(alpha: 0.35),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${h.manufacturer} — Autostart',
                         style: const TextStyle(color: DuetColors.text, fontSize: 15.5)),
@@ -142,7 +142,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               const SectionLabel('Missed alarms'),
               const SizedBox(height: 10),
               DuetCard(
-                border: DuetColors.amber,
+                border: SkinColors.instance.accent,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text(
                     'These were due while the app was not running, so they did '
@@ -151,8 +151,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(h!.missedLog.trim(),
-                      style: const TextStyle(
-                          color: DuetColors.amber,
+                      style: TextStyle(
+                          color: SkinColors.instance.accent,
                           fontSize: 11.5,
                           height: 1.5,
                           fontFamily: 'monospace')),
@@ -222,7 +222,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         child: DuetCard(
           child: Row(children: [
             Icon(ok ? Icons.check_circle_outline : Icons.error_outline,
-                color: ok ? DuetColors.teal : DuetColors.amber, size: 20),
+                color: ok ? DuetColors.teal : SkinColors.instance.accent, size: 20),
             const SizedBox(width: 13),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -238,8 +238,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                 onPressed: () async {
                   await AlarmEngine.openSetting(settingKey);
                 },
-                child: const Text('Fix',
-                    style: TextStyle(color: DuetColors.amber, fontSize: 14.5)),
+                child: Text('Fix',
+                    style: TextStyle(color: SkinColors.instance.accent, fontSize: 14.5)),
               ),
           ]),
         ),

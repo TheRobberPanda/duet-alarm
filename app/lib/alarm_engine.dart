@@ -50,6 +50,12 @@ class AlarmEngine {
         'userId': userId,
       });
 
+  /// The two ring colors, so the native ringing screen wears the same skins as
+  /// the rest of the app. It has no Flutter engine to ask, so the choice has to
+  /// be pushed down whenever it changes.
+  static Future<void> setSkinColors(int mine, int partner) =>
+      _channel.invokeMethod('setSkinColors', {'mine': mine, 'partner': partner});
+
   /// What the native LAN fast path (LanSync.kt) needs to sign its datagrams,
   /// route them to the right pair, and decide whether to honour an incoming
   /// "dismiss for both". Nulls clear it -- which is what leaving a pair or

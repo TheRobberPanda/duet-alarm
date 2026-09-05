@@ -196,7 +196,13 @@ class RingingActivity : Activity() {
         // alarm" to someone squinting at 06:00.
         val dial = FrameLayout(this)
         dial.addView(
-            PairRingView(this),
+            PairRingView(
+                this,
+                // Whatever skins the two of you picked, pushed down from Dart
+                // (AuthStore.setSkinColors). Falls back to the classic pair.
+                mineColor = AuthStore.skinMine(this, Color.parseColor("#C9AEE8")),
+                themColor = AuthStore.skinPartner(this, Color.parseColor("#F0A8C8")),
+            ),
             FrameLayout.LayoutParams(dp(268), dp(268), Gravity.CENTER)
         )
 
@@ -238,7 +244,7 @@ class RingingActivity : Activity() {
         // Milestone 4's live awareness strip. Empty and GONE until polling finds
         // a partner row to report -- see startAwarenessPolling().
         awarenessView = TextView(this).apply {
-            setTextColor(Color.parseColor("#C9AEE8"))
+            setTextColor(AuthStore.skinPartner(this@RingingActivity, Color.parseColor("#F0A8C8")))
             textSize = 14f
             gravity = Gravity.CENTER
             visibility = View.GONE
@@ -257,12 +263,22 @@ class RingingActivity : Activity() {
 
         if (snoozesLeft > 0) {
             controls.addView(
-                actionButton("Snooze", "#33232D", "#F5EDE6", outlined = true) { snooze() },
+                actionButton(
+                    "Snooze",
+                    Color.parseColor("#33232D"),
+                    Color.parseColor("#F5EDE6"),
+                    outlined = true
+                ) { snooze() },
                 LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; rightMargin = dp(6) }
             )
         }
         controls.addView(
-            actionButton("Dismiss", "#F0A8C8", "#3D1526", outlined = false) { dismiss() }
+            actionButton(
+                "Dismiss",
+                AuthStore.skinMine(this, Color.parseColor("#F0A8C8")),
+                Color.parseColor("#3D1526"),
+                outlined = false
+            ) { dismiss() }
                 .apply {
                     if (pairId != null) {
                         setOnLongClickListener { dismissForBoth(); true }
@@ -295,15 +311,15 @@ class RingingActivity : Activity() {
     }
 
     private fun actionButton(
-        label: String, bg: String, fg: String, outlined: Boolean, onClick: () -> Unit
+        label: String, bg: Int, fg: Int, outlined: Boolean, onClick: () -> Unit
     ) = Button(this).apply {
         text = label
         isAllCaps = false
         textSize = 18f
-        setTextColor(Color.parseColor(fg))
+        setTextColor(fg)
         background = GradientDrawable().apply {
             cornerRadius = dp(20).toFloat()
-            setColor(Color.parseColor(bg))
+            setColor(bg)
             if (outlined) setStroke(dp(1), Color.parseColor("#4A3540"))
         }
         stateListAnimator = null
@@ -347,7 +363,11 @@ class RingingActivity : Activity() {
  * The two-tone ring, drawn rather than bundled so it scales to any density and
  * needs no asset. Right half lavender (you), left half pink (them).
  */
-private class PairRingView(context: Context) : View(context) {
+private class PairRingView(
+    context: Context,
+    mineColor: Int,
+    themColor: Int,
+) : View(context) {
     private val track = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = Color.parseColor("#33232D")
@@ -355,12 +375,12 @@ private class PairRingView(context: Context) : View(context) {
     private val you = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        color = Color.parseColor("#C9AEE8")
+        color = mineColor
     }
     private val them = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        color = Color.parseColor("#F0A8C8")
+        color = themColor
     }
 
     override fun onDraw(canvas: Canvas) {
