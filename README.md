@@ -23,31 +23,27 @@ both of you. You pick the sound the other person wakes up to.
 | [11 — Market](docs/11-market.md) | Competitors, growth mechanics, risks, free validation plan. |
 | [12 — Roadblocks](docs/12-roadblocks.md) | What will block you, when, and what to prepare now. |
 | [13 — Milestone 0](docs/13-milestone-0.md) | **Start here to build.** Setup, layout, and the test plan. |
+| [14 — Handoff](docs/14-handoff.md) | **Start here to continue.** Environment, gotchas, and what is actually verified. |
 | [design/DESIGN-PROMPT.md](design/DESIGN-PROMPT.md) | Brief for generating the app mockups. |
 
 ## Status
 
-**Milestone 0** — alarm proven on hardware: rings 1.45 s late across a reboot,
-before first unlock. Tests 1, 2, 3, 9, 10 pass; 4–8 and 11–14 outstanding.
+**Milestone 0** — alarm proven on hardware: fires on time, survives a reboot, and
+rings before first unlock. Tests 1, 2, 3, 9, 10, 11 pass. **Test 14 — overnight,
+offline, in a drawer — is still outstanding and is the one that matters.**
 
-**Milestone 2** — Supabase backend live (schema, RLS, verified against an
-attacker) and Flutter wired to it. Gated off behind `DUET_BACKEND` until the
-email template and SMTP are configured (supabase/README.md).
+**Milestone 2** — Supabase backend live (schema, RLS verified against a simulated
+attacker) and reachable from the app. Real two-device pairing works: two phones,
+two accounts, the real invite-code flow.
 
-**Milestone 3 in progress** — the app itself, running standalone: alarm list,
-editor, device-sound picker, alarm-health screen. No backend required, which
-ADR-001 makes possible: alarms are scheduled locally and the network only ever
-carries definitions.
+**Milestone 3** — alarms sync to Postgres and back, including per-listener sounds
+and per-person on/off. The app is also fully usable standalone, which ADR-001
+makes possible: alarms are scheduled locally and the network only ever carries
+definitions.
 
-Budget: €0 (doc 10). Android-only; iOS deferred until there is revenue.
+**Milestone 4, partial** — ring sessions report to Postgres as they happen, the
+ringing screen shows what the partner did, and holding Dismiss ends the alarm for
+both. A local-wifi fast path exists but is **not yet verified with two devices**.
 
-```bash
-source tool/env.sh && cd app && flutter run
-```
-
-## The one thing to remember
-
-**Alarms are scheduled locally on every device that will ring.** The network syncs
-alarm *definitions*, never alarm *triggers*. If the server is down, the phone in
-airplane mode, or the push dropped — the alarm still rings. This constraint drives
-the entire architecture.
+For the full picture of what is proven versus merely built, see
+[docs/14-handoff.md](docs/14-handoff.md).
