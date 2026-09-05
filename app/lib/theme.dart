@@ -27,9 +27,6 @@ class DuetColors {
   static const teal = Color(0xFFC9AEE8);
   static const danger = Color(0xFFE87DA0);
 
-  /// The two accents as one diagonal wash -- gradient buttons, the sparkle
-  /// backdrop, anything that wants to say "girly" in one brushstroke rather
-  /// than a flat fill.
   // NOTE: the app's accent gradient is NOT here. It lives on SkinColors as a
   // live getter, because it depends on which skin each of you picked -- see
   // SkinColors.wash. These constants are only the fallbacks it defaults to.
@@ -532,12 +529,22 @@ class PairRing extends StatefulWidget {
     super.key,
     this.size = 56,
     this.hasPartner = true,
+    this.mineOn = true,
     this.strokeWidth = 2.5,
     this.animate = true,
   });
 
   final double size;
+
+  /// Whether the partner's half is drawn at all: they exist AND have this
+  /// alarm switched on their end (Alarm.partnerEnabled).
   final bool hasPartner;
+
+  /// Whether YOUR half is drawn -- i.e. you have it switched on. A ring with
+  /// neither half lit is just the dim track, which is exactly what an alarm
+  /// nobody has enabled should look like.
+  final bool mineOn;
+
   final double strokeWidth;
   final bool animate;
 
@@ -588,13 +595,15 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
                 size: Size(widget.size, widget.size),
                 painter: _PairRingPainter(
                   hasPartner: widget.hasPartner,
+                  mineOn: widget.mineOn,
                   strokeWidth: widget.strokeWidth,
                   mine: skins.mine,
                   partner: skins.partner,
                 ),
               ),
               if (widget.size >= _badgeMinRingSize) ...[
-                _skinBadge(skins.mineSkin, badge, left: widget.size / 2 + r - badge / 2),
+                if (widget.mineOn)
+                  _skinBadge(skins.mineSkin, badge, left: widget.size / 2 + r - badge / 2),
                 if (widget.hasPartner && skins.partnerSkin != null)
                   _skinBadge(skins.partnerSkin!, badge,
                       left: widget.size / 2 - r - badge / 2),
@@ -629,12 +638,14 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
 class _PairRingPainter extends CustomPainter {
   _PairRingPainter({
     required this.hasPartner,
+    required this.mineOn,
     required this.strokeWidth,
     required this.mine,
     required this.partner,
   });
 
   final bool hasPartner;
+  final bool mineOn;
   final double strokeWidth;
   final Color mine;
   final Color partner;
@@ -657,8 +668,10 @@ class _PairRingPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..color = colour;
 
-    // Right half = you, left half = them.
-    canvas.drawArc(rect, -1.5708, 3.1416, false, arc(mine));
+    // Right half = you, left half = them -- each drawn only if that person
+    // has the alarm switched on, so the ring reads at a glance as "we are
+    // both up for this" / "only one of us is".
+    if (mineOn) canvas.drawArc(rect, -1.5708, 3.1416, false, arc(mine));
     if (hasPartner) {
       canvas.drawArc(rect, 1.5708, 3.1416, false, arc(partner));
     }
@@ -667,6 +680,7 @@ class _PairRingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_PairRingPainter old) =>
       old.hasPartner != hasPartner ||
+      old.mineOn != mineOn ||
       old.strokeWidth != strokeWidth ||
       old.mine != mine ||
       old.partner != partner;

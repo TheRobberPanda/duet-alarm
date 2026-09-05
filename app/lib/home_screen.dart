@@ -394,7 +394,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PairRing(size: 84, hasPartner: alarm.ringTarget != RingTarget.owner),
+                PairRing(
+                  size: 84,
+                  mineOn: alarm.enabled,
+                  hasPartner: alarm.partnerEnabled &&
+                      alarm.ringTarget != RingTarget.owner,
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -448,7 +453,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 PairRing(
                   size: 26,
                   strokeWidth: 2,
-                  hasPartner: alarm.enabled && alarm.ringTarget != RingTarget.owner,
+                  mineOn: alarm.enabled,
+                  hasPartner: alarm.partnerEnabled &&
+                      alarm.ringTarget != RingTarget.owner,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

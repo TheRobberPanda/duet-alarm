@@ -22,6 +22,7 @@ class Alarm {
     this.maxSnoozes = 3,
     this.ringTarget = RingTarget.both,
     this.pairId,
+    this.partnerEnabled = true,
     this.deletedAt,
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? DateTime.now();
@@ -51,6 +52,13 @@ class Alarm {
   /// The pair this alarm belongs to, or null while the user is solo. Set once
   /// pairing exists so the alarm is visible to both people under RLS.
   final String? pairId;
+
+  /// Whether the PARTNER has this alarm switched on, from their own
+  /// per-listener row (migration 0010). Display only -- it paints their half of
+  /// the ring and never influences what this phone arms, which is governed
+  /// solely by [enabled]. Defaults true so a solo user, or an alarm with no
+  /// partner row yet, looks no different than before.
+  final bool partnerEnabled;
 
   /// Soft delete. A tombstone has to reach the other device to disarm it there;
   /// a hard delete that never syncs is an alarm that rings forever (docs/03).
@@ -109,6 +117,7 @@ class Alarm {
     int? maxSnoozes,
     RingTarget? ringTarget,
     String? pairId,
+    bool? partnerEnabled,
     DateTime? deletedAt,
   }) =>
       Alarm(
@@ -125,6 +134,7 @@ class Alarm {
         maxSnoozes: maxSnoozes ?? this.maxSnoozes,
         ringTarget: ringTarget ?? this.ringTarget,
         pairId: pairId ?? this.pairId,
+        partnerEnabled: partnerEnabled ?? this.partnerEnabled,
         deletedAt: deletedAt ?? this.deletedAt,
         updatedAt: DateTime.now(),
       );
@@ -202,14 +212,22 @@ class Alarm {
         // conflicts on it, and a client that could set it could win every one.
       };
 
-  factory Alarm.fromDbRow(Map<String, dynamic> r, {String soundRef = 'default'}) {
+  factory Alarm.fromDbRow(
+    Map<String, dynamic> r, {
+    String soundRef = 'default',
+    /// This listener's own switch. Null means they have no per-listener row
+    /// yet, in which case the shared column stands in (migration 0010).
+    bool? enabled,
+    bool partnerEnabled = true,
+  }) {
     final t = (r['local_time'] as String).split(':');
     return Alarm(
       id: r['id'] as String,
       hour: int.parse(t[0]),
       minute: int.parse(t[1]),
       label: (r['label'] as String?) ?? '',
-      enabled: (r['enabled'] as bool?) ?? true,
+      enabled: enabled ?? (r['enabled'] as bool?) ?? true,
+      partnerEnabled: partnerEnabled,
       repeatDays: (r['repeat_days'] as int?) ?? Repeat.none,
       oneShotDate: r['one_shot_date'] == null
           ? null

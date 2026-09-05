@@ -31,13 +31,22 @@ class AlarmSync {
 
     try {
       final remoteRows = await _db.from('alarms').select();
-      final sounds = await _fetchMySounds(uid);
+      final prefs = await _fetchListenerPrefs(uid);
 
       final remote = <String, Alarm>{};
       for (final row in remoteRows) {
         final map = Map<String, dynamic>.from(row);
         final id = map['id'] as String;
-        remote[id] = Alarm.fromDbRow(map, soundRef: sounds[id] ?? 'default');
+        remote[id] = Alarm.fromDbRow(
+          map,
+          soundRef: prefs.mySounds[id] ?? 'default',
+          // My own switch, falling back to the shared column for any alarm
+          // that predates per-listener rows.
+          enabled: prefs.myEnabled[id],
+          // Theirs is display-only: it paints their half of the ring and
+          // never affects what this phone arms.
+          partnerEnabled: prefs.partnerEnabled[id] ?? true,
+        );
       }
 
       final localById = {for (final a in local) a.id: a};
@@ -102,14 +111,45 @@ class AlarmSync {
     }
   }
 
-  Future<Map<String, String>> _fetchMySounds(String uid) async {
-    final rows = await _db
-        .from('alarm_sounds')
-        .select('alarm_id, sound_ref')
-        .eq('listener_id', uid);
-    return {
-      for (final r in rows) r['alarm_id'] as String: r['sound_ref'] as String,
-    };
+  /// Every per-listener row this account can see -- mine, and (through RLS's
+  /// shares_pair_with) my partner's. One round trip for both, since the ring
+  /// needs to know not just what I hear but whether THEY have it switched on.
+  Future<_ListenerPrefs> _fetchListenerPrefs(String uid) async {
+    // Client and database never deploy at the same instant. If `enabled`
+    // (migration 0010) is not there yet, fall back to the columns that always
+    // have been rather than failing the whole sync over one new field -- an
+    // alarm clock that stops syncing because of a pending migration is a much
+    // worse outcome than one that briefly cannot tell whose switch is on.
+    List<Map<String, dynamic>> rows;
+    var hasEnabledColumn = true;
+    try {
+      rows = List<Map<String, dynamic>>.from(await _db
+          .from('alarm_sounds')
+          .select('alarm_id, listener_id, sound_ref, enabled'));
+    } on PostgrestException {
+      hasEnabledColumn = false;
+      rows = List<Map<String, dynamic>>.from(
+          await _db.from('alarm_sounds').select('alarm_id, listener_id, sound_ref'));
+    }
+
+    final mySounds = <String, String>{};
+    final myEnabled = <String, bool>{};
+    final partnerEnabled = <String, bool>{};
+
+    for (final row in rows) {
+      final alarmId = row['alarm_id'] as String;
+      final enabled = (row['enabled'] as bool?) ?? true;
+      if (row['listener_id'] == uid) {
+        mySounds[alarmId] = (row['sound_ref'] as String?) ?? 'default';
+        // Leave myEnabled unset without the column, so Alarm.fromDbRow falls
+        // through to the shared alarms.enabled instead of asserting `true`
+        // over the top of a genuinely switched-off alarm.
+        if (hasEnabledColumn) myEnabled[alarmId] = enabled;
+      } else if (hasEnabledColumn) {
+        partnerEnabled[alarmId] = enabled;
+      }
+    }
+    return _ListenerPrefs(mySounds, myEnabled, partnerEnabled);
   }
 
   Future<void> _push(Alarm alarm, String uid) async {
@@ -117,13 +157,22 @@ class AlarmSync {
 
     // The sound is per-listener, not per-alarm: this row is what *I* hear.
     // Choosing what the partner hears writes a second row with their id, which
-    // is the feature the whole product is built around (docs/01).
-    await _db.from('alarm_sounds').upsert({
+    // is the feature the whole product is built around (docs/01). `enabled` is
+    // per-listener for the same reason -- switching an alarm off here must not
+    // silence it on their phone (migration 0010).
+    final row = {
       'alarm_id': alarm.id,
       'listener_id': uid,
       'sound_ref': alarm.soundRef,
       'set_by': uid,
-    });
+    };
+    try {
+      await _db.from('alarm_sounds').upsert({...row, 'enabled': alarm.enabled});
+    } on PostgrestException {
+      // Same reasoning as the read path: a pending migration must not cost us
+      // the sound row too.
+      await _db.from('alarm_sounds').upsert(row);
+    }
   }
 
   /// Marks an alarm deleted rather than removing the row, so the tombstone can
@@ -150,4 +199,13 @@ class SyncResult {
   final bool synced;
   final int conflicts;
   final String? error;
+}
+
+/// One round trip's worth of per-listener rows, split by whose they are.
+class _ListenerPrefs {
+  _ListenerPrefs(this.mySounds, this.myEnabled, this.partnerEnabled);
+
+  final Map<String, String> mySounds;
+  final Map<String, bool> myEnabled;
+  final Map<String, bool> partnerEnabled;
 }
