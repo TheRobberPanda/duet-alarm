@@ -136,6 +136,13 @@ class _PairGateState extends State<PairGate> {
         // this only runs on sign-in/pairing changes, not on every rebuild.
         final me = await _repo.myProfile();
         SkinColors.instance.setSkins(mine: me?.accent, partner: pair?.partner?.accent);
+        // And the native side gets what the LAN fast path needs to sign and
+        // authorise datagrams while the app itself is not running.
+        await AlarmEngine.setPairContext(
+          pairId: pair?.pairId,
+          lanSecret: pair?.lanSecret,
+          allowPartnerDismiss: me?.allowPartnerDismiss ?? true,
+        );
         return pair;
       });
     });

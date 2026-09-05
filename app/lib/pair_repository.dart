@@ -160,6 +160,7 @@ class PairRepository {
       pairId: pairId,
       plan: pair['plan'] as String? ?? 'free',
       partner: partner,
+      lanSecret: pair['lan_secret'] as String?,
     );
   }
 
@@ -200,13 +201,22 @@ class Profile {
 }
 
 class PairState {
-  PairState({required this.pairId, required this.plan, this.partner});
+  PairState({
+    required this.pairId,
+    required this.plan,
+    this.partner,
+    this.lanSecret,
+  });
 
   final String pairId;
   final String plan;
 
   /// Null while the pair is waiting for the second person to redeem the code.
   final Profile? partner;
+
+  /// Signs the local-network fast path's datagrams (LanSync.kt). Readable only
+  /// by the two members, and never transmitted -- only used as an HMAC key.
+  final String? lanSecret;
 
   bool get isComplete => partner != null;
   bool get isPaid => plan == 'full';

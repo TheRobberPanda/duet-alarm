@@ -107,6 +107,18 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
 
+                    // The pair context LanSync signs and authorises with. Nulls
+                    // clear it, which is what leaving a pair or signing out does.
+                    "setPairContext" -> {
+                        AuthStore.setPairContext(
+                            this,
+                            call.argument<String>("pairId"),
+                            call.argument<String>("lanSecret"),
+                            call.argument<Boolean>("allowPartnerDismiss") ?: true
+                        )
+                        result.success(null)
+                    }
+
                     else -> result.notImplemented()
                 }
             }

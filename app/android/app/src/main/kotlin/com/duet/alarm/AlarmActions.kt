@@ -72,10 +72,16 @@ object AlarmActions {
     }
 
     /** The fired-instant id, not a snooze-wrapped one -- a snooze is part of the
-     *  same ring session, not a new one, so it must resolve to the same id. */
+     *  same ring session, not a new one, so it must resolve to the same id.
+     *
+     *  Reported over both transports: the cloud path is the record, the LAN
+     *  path is what makes the partner's screen update in the same breath when
+     *  they are on the same wifi. */
     private fun reportState(ctx: Context, baseFireId: String, state: String, pairId: String?) {
+        if (pairId == null) return
         val (alarmId, firedAt) = splitFireId(baseFireId) ?: return
         RingSync.updateState(ctx, alarmId, firedAt, pairId, state)
+        LanSync.announceState(ctx, RingSync.sessionIdFor(alarmId, firedAt), state)
     }
 
     private fun endRing(ctx: Context) =

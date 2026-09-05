@@ -22,6 +22,7 @@ class AlarmService : Service() {
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentId: String? = null
+    private var currentPairId: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -36,6 +37,7 @@ class AlarmService : Service() {
 
         currentId = id
         val def = AlarmStore.find(this, id)
+        currentPairId = def?.pairId
         val label = def?.label?.takeIf { it.isNotBlank() } ?: "Alarm"
 
         // Must happen within a few seconds of the service starting or the system
@@ -68,11 +70,48 @@ class AlarmService : Service() {
         return START_STICKY
     }
 
-    /** Only a shared alarm (pairId set) is worth reporting -- see RingSync.kt. */
+    /**
+     * Only a shared alarm (pairId set) is worth reporting -- see RingSync.kt.
+     *
+     * Both transports run: the cloud path always (it is the record), and the
+     * LAN path in parallel for the case where the partner is on the same wifi
+     * and a few seconds of polling latency would be silly. Neither waits on
+     * the other, and neither can hold up the ring.
+     */
     private fun reportRinging(def: AlarmDef?) {
-        if (def == null) return
+        if (def == null || def.pairId == null) return
         val (alarmId, firedAt) = splitFireId(def.baseId) ?: return
         RingSync.startRinging(this, alarmId, firedAt, def.pairId)
+        LanSync.announceState(this, RingSync.sessionIdFor(alarmId, firedAt), "ringing")
+        startLanListener()
+    }
+
+    /**
+     * Listens for the partner's LAN messages for as long as this service is
+     * alive -- which is exactly as long as the alarm is ringing. Held here
+     * rather than in RingingActivity because the activity is not always the
+     * surface in play: on an unlocked phone Android shows the heads-up
+     * notification instead, and a "dismiss for both" has to land either way.
+     */
+    private fun startLanListener() {
+        LanSync.startListening(this) { state, act ->
+            if (act == "dismiss") {
+                // The receiver decides, not the sender: this phone checks its
+                // own preference rather than trusting the datagram (LanSync.kt
+                // rule 3).
+                if (AuthStore.allowPartnerDismiss(this)) {
+                    currentId?.let { AlarmActions.dismiss(this, it, currentPairId) }
+                }
+                return@startListening
+            }
+            if (state != null) {
+                sendBroadcast(
+                    Intent(LanSync.ACTION_PARTNER_STATE)
+                        .setPackage(packageName)
+                        .putExtra(LanSync.EXTRA_STATE, state)
+                )
+            }
+        }
     }
 
     private fun rearmNextOccurrence(def: AlarmDef?) {
@@ -234,6 +273,8 @@ class AlarmService : Service() {
     }
 
     private fun stopRinging() {
+        // The socket lives exactly as long as the ring does -- see startLanListener().
+        LanSync.stopListening()
         try { player?.stop() } catch (_: Throwable) {}
         player?.release(); player = null
         vibrator?.cancel(); vibrator = null

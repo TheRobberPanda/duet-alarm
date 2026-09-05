@@ -8,6 +8,12 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
 
+    <!-- Flutter only scaffolds INTERNET into the debug and profile manifests, so
+         a RELEASE build silently ships with no network at all: sign-in, alarm
+         sync and ring sessions all fail with nothing to show for it. Declared
+         here so release behaves like debug. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

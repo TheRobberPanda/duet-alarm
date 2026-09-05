@@ -22,6 +22,9 @@ object AuthStore {
     private const val PREFS = "duet_auth"
     private const val KEY_TOKEN = "access_token"
     private const val KEY_USER = "user_id"
+    private const val KEY_PAIR = "pair_id"
+    private const val KEY_LAN_SECRET = "lan_secret"
+    private const val KEY_ALLOW_PARTNER_DISMISS = "allow_partner_dismiss"
 
     private fun prefs(ctx: Context) =
         ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -33,6 +36,32 @@ object AuthStore {
             .apply()
     }
 
+    /**
+     * The pair context LanSync needs to sign, route and authorise datagrams.
+     * Pushed down separately from the token because it changes on a different
+     * schedule -- pairing and preference changes, not auth refreshes.
+     */
+    fun setPairContext(
+        ctx: Context,
+        pairId: String?,
+        lanSecret: String?,
+        allowPartnerDismiss: Boolean,
+    ) {
+        prefs(ctx).edit()
+            .putString(KEY_PAIR, pairId)
+            .putString(KEY_LAN_SECRET, lanSecret)
+            .putBoolean(KEY_ALLOW_PARTNER_DISMISS, allowPartnerDismiss)
+            .apply()
+    }
+
     fun accessToken(ctx: Context): String? = prefs(ctx).getString(KEY_TOKEN, null)
     fun userId(ctx: Context): String? = prefs(ctx).getString(KEY_USER, null)
+    fun pairId(ctx: Context): String? = prefs(ctx).getString(KEY_PAIR, null)
+    fun lanSecret(ctx: Context): String? = prefs(ctx).getString(KEY_LAN_SECRET, null)
+
+    /** Defaults to true, matching the column default -- but a phone that has
+     *  never synced should not be MORE permissive than one that has, so the
+     *  LAN path also requires a pair context to exist before it acts at all. */
+    fun allowPartnerDismiss(ctx: Context): Boolean =
+        prefs(ctx).getBoolean(KEY_ALLOW_PARTNER_DISMISS, true)
 }

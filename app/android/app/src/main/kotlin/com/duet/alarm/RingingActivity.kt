@@ -74,6 +74,10 @@ class RingingActivity : Activity() {
             this, ringEnded, IntentFilter(AlarmActions.ACTION_RING_ENDED),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
+        ContextCompat.registerReceiver(
+            this, partnerStateOverLan, IntentFilter(LanSync.ACTION_PARTNER_STATE),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         startAwarenessPolling()
     }
@@ -132,8 +136,20 @@ class RingingActivity : Activity() {
         val base = id.removePrefix(AlarmDef.SNOOZE_PREFIX)
         val (alarm, firedAt) = splitFireId(base) ?: return dismiss()
         vibrateConfirm()
+        // Both roads at once: the LAN datagram lands in milliseconds if they
+        // are on the same wifi, the RPC covers them being anywhere else.
+        // Whichever arrives first wins; the second is a harmless no-op.
+        LanSync.requestDismissForBoth(this, RingSync.sessionIdFor(alarm, firedAt))
         RingSync.actOnPartner(this, alarm, firedAt, pairId, "dismiss") { }
         dismiss()
+    }
+
+    /** A partner state message that came in over the LAN, relayed by
+     *  AlarmService -- the same strip the 4s poll drives, just instant. */
+    private val partnerStateOverLan = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) {
+            showAwareness(i?.getStringExtra(LanSync.EXTRA_STATE))
+        }
     }
 
     private val ringEnded = object : BroadcastReceiver() {
@@ -143,6 +159,7 @@ class RingingActivity : Activity() {
     override fun onDestroy() {
         pollHandler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(ringEnded) }
+        runCatching { unregisterReceiver(partnerStateOverLan) }
         super.onDestroy()
     }
 

@@ -242,7 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 10),
               DuetCard(
                 child: Row(children: [
-                  PairRing(size: 30, strokeWidth: 2, hasPartner: paired),
+                  PairRing(size: 40, strokeWidth: 2.5, hasPartner: paired),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
@@ -287,14 +287,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Switch(
                       value: allowPartnerDismiss,
                       activeThumbColor: DuetColors.amberInk,
-                      activeTrackColor: DuetColors.amber,
+                      activeTrackColor: SkinColors.instance.accent,
                       inactiveThumbColor: const Color(0xFF5A4C50),
                       inactiveTrackColor: const Color(0xFF2E2129),
                       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                       thumbIcon: WidgetStateProperty.resolveWith((states) =>
                           states.contains(WidgetState.selected)
-                              ? const Icon(Icons.favorite_rounded,
-                                  size: 14, color: DuetColors.amber)
+                              ? Icon(SkinColors.instance.mineSkin.icon,
+                                  size: 14, color: SkinColors.instance.accent)
                               : null),
                       onChanged: _setAllowPartnerDismiss,
                     ),

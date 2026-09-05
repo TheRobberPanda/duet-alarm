@@ -64,7 +64,7 @@ class _SignInScreenState extends State<SignInScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              const Center(child: PairRing(size: 72)),
+              const Center(child: PairRing(size: 96)),
               const SizedBox(height: 28),
               const Row(
                 children: [

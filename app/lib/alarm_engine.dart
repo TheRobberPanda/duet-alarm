@@ -50,6 +50,21 @@ class AlarmEngine {
         'userId': userId,
       });
 
+  /// What the native LAN fast path (LanSync.kt) needs to sign its datagrams,
+  /// route them to the right pair, and decide whether to honour an incoming
+  /// "dismiss for both". Nulls clear it -- which is what leaving a pair or
+  /// signing out should do.
+  static Future<void> setPairContext({
+    String? pairId,
+    String? lanSecret,
+    bool allowPartnerDismiss = true,
+  }) =>
+      _channel.invokeMethod('setPairContext', {
+        'pairId': pairId,
+        'lanSecret': lanSecret,
+        'allowPartnerDismiss': allowPartnerDismiss,
+      });
+
   static Future<void> disarm(String id) =>
       _channel.invokeMethod('disarm', {'id': id});
 

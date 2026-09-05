@@ -137,6 +137,8 @@ object RingSync {
 
     /** Deterministic, so both phones ringing the same shared alarm agree on the
      *  session id without either having to create it first. */
+    fun sessionIdFor(alarmId: String, firedAtUtc: Long): String = sessionId(alarmId, firedAtUtc)
+
     private fun sessionId(alarmId: String, firedAtUtc: Long): String =
         UUID.nameUUIDFromBytes("$alarmId:$firedAtUtc".toByteArray()).toString()
 

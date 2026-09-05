@@ -30,11 +30,9 @@ class DuetColors {
   /// The two accents as one diagonal wash -- gradient buttons, the sparkle
   /// backdrop, anything that wants to say "girly" in one brushstroke rather
   /// than a flat fill.
-  static const wash = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [amber, teal],
-  );
+  // NOTE: the app's accent gradient is NOT here. It lives on SkinColors as a
+  // live getter, because it depends on which skin each of you picked -- see
+  // SkinColors.wash. These constants are only the fallbacks it defaults to.
 }
 
 /// Paints behind every screen (see main.dart's [MaterialApp.builder]): a soft
@@ -51,10 +49,12 @@ class GirlyBackdrop extends StatelessWidget {
   // Corners only, small and faint -- a hint of color peeking in rather than a
   // wash sitting over the content. The first pass used huge blurred spreads
   // that muddied every card; this is deliberately closer to "barely there".
+  // Positions and sizes are fixed; the colors come from whichever skins are
+  // active, so the glow in the corners is literally the two of you.
   static const _bokeh = [
-    (Alignment(-1.15, -1.1), 130.0, DuetColors.amber),
-    (Alignment(1.2, -1.15), 150.0, DuetColors.teal),
-    (Alignment(1.15, 1.2), 140.0, DuetColors.amber),
+    (Alignment(-1.15, -1.1), 130.0, false),
+    (Alignment(1.2, -1.15), 150.0, true),
+    (Alignment(1.15, 1.2), 140.0, false),
   ];
 
   // A few tiny fixed sparkle points -- actual twinkle rather than another
@@ -68,7 +68,8 @@ class GirlyBackdrop extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
+  Widget build(BuildContext context) => SkinBuilder(
+        builder: (context, skins) => DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -79,7 +80,7 @@ class GirlyBackdrop extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            for (final (align, size, color) in _bokeh)
+            for (final (align, size, isPartner) in _bokeh)
               Align(
                 alignment: align,
                 child: Container(
@@ -88,7 +89,10 @@ class GirlyBackdrop extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0)],
+                      colors: [
+                        (isPartner ? skins.partner : skins.mine).withValues(alpha: 0.16),
+                        (isPartner ? skins.partner : skins.mine).withValues(alpha: 0),
+                      ],
                     ),
                   ),
                 ),
@@ -111,21 +115,42 @@ class GirlyBackdrop extends StatelessWidget {
             child,
           ],
         ),
+        ),
+      );
+}
+
+/// Rebuilds its subtree whenever either side's skin changes. The way anything
+/// that paints in the live accent stays in step, without every widget growing
+/// its own listener -- see [SkinColors].
+class SkinBuilder extends StatelessWidget {
+  const SkinBuilder({super.key, required this.builder});
+
+  final Widget Function(BuildContext context, SkinColors skins) builder;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: SkinColors.instance,
+        builder: (context, _) => builder(context, SkinColors.instance),
       );
 }
 
 /// A small, quiet decoration -- never the point of a layout, just a wink that
 /// this is Duet. Kept to one glyph size so a row of them never competes with
-/// real content for attention.
+/// real content for attention. Follows your skin unless given a color.
 class HeartAccent extends StatelessWidget {
-  const HeartAccent({super.key, this.size = 14, this.color = DuetColors.amber});
+  const HeartAccent({super.key, this.size = 14, this.color});
 
   final double size;
-  final Color color;
+  final Color? color;
 
   @override
-  Widget build(BuildContext context) =>
-      Icon(Icons.favorite_rounded, size: size, color: color.withValues(alpha: 0.85));
+  Widget build(BuildContext context) => SkinBuilder(
+        builder: (context, skins) => Icon(
+          skins.mineSkin.icon,
+          size: size,
+          color: (color ?? skins.accent).withValues(alpha: 0.85),
+        ),
+      );
 }
 
 ThemeData duetTheme() => ThemeData(
@@ -178,22 +203,24 @@ class DuetCard extends StatelessWidget {
   final Color? color;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: (color ?? DuetColors.surface).withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: border ?? DuetColors.amber.withValues(alpha: 0.16)),
-          boxShadow: [
-            BoxShadow(
-              color: DuetColors.amber.withValues(alpha: 0.06),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
+  Widget build(BuildContext context) => SkinBuilder(
+        builder: (context, skins) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: (color ?? DuetColors.surface).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: border ?? skins.accent.withValues(alpha: 0.16)),
+            boxShadow: [
+              BoxShadow(
+                color: skins.accent.withValues(alpha: 0.06),
+                blurRadius: 22,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: child,
         ),
-        child: child,
       );
 }
 
@@ -217,7 +244,9 @@ class _DuetButtonState extends State<DuetButton> {
   bool _pressed = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => SkinBuilder(builder: (context, _) => _build());
+
+  Widget _build() {
     final child = widget.busy
         ? const SizedBox(
             height: 20, width: 20,
@@ -239,13 +268,13 @@ class _DuetButtonState extends State<DuetButton> {
                 borderRadius: BorderRadius.circular(15),
                 child: Ink(
                   decoration: BoxDecoration(
-                    gradient: DuetColors.wash,
+                    gradient: SkinColors.instance.wash,
                     borderRadius: BorderRadius.circular(15),
-                    boxShadow: const [
+                    boxShadow: [
                       BoxShadow(
-                        color: Color(0x40F0A8C8),
+                        color: SkinColors.instance.accent.withValues(alpha: 0.25),
                         blurRadius: 18,
-                        offset: Offset(0, 6),
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
@@ -461,6 +490,21 @@ class SkinColors extends ChangeNotifier {
 
   Color get mine => mineSkin.color;
   Color get partner => partnerSkin?.color ?? DuetColors.amber;
+
+  /// The app's primary accent -- buttons, glows, toggles, the lot. Your own
+  /// skin, so picking one re-skins the whole app rather than just your half of
+  /// the ring.
+  Color get accent => mine;
+
+  /// The two of you as one gradient: your color running into theirs. Used for
+  /// every filled surface (buttons, the FAB, selected pills), so the pair is
+  /// literally what the app is painted in. Unpaired, `partner` falls back to
+  /// the classic pink and this reads much as it always did.
+  LinearGradient get wash => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [mine, partner],
+      );
 
   /// Either argument left null means "leave that side as it is" -- NOT
   /// "reset to default". The settings screen relies on this to update only

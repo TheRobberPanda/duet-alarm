@@ -300,12 +300,14 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: on ? DuetColors.wash : null,
+              gradient: on ? SkinColors.instance.wash : null,
               color: on ? null : DuetColors.surface,
               shape: BoxShape.circle,
               border: on ? null : Border.all(color: DuetColors.line),
               boxShadow: on
-                  ? const [BoxShadow(color: Color(0x40F0A8C8), blurRadius: 10)]
+                  ? [BoxShadow(
+                      color: SkinColors.instance.accent.withValues(alpha: 0.25),
+                      blurRadius: 10)]
                   : null,
             ),
             child: Text(names[i],
@@ -366,7 +368,7 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
                   height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: on ? DuetColors.wash : null,
+                    gradient: on ? SkinColors.instance.wash : null,
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Text(t.label,

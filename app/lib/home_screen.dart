@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
-    _tipTicker = Timer.periodic(const Duration(seconds: 6), (_) {
+    _tipTicker = Timer.periodic(const Duration(seconds: 14), (_) {
       if (mounted) setState(() => _tipIndex++);
     });
   }
@@ -132,7 +132,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final alarms = _repo.alarms;
     final next = _repo.nextUp();
 
-    return Scaffold(
+    // Wrapped so a skin picked over in Settings repaints this screen the
+    // moment you come back, rather than whenever the next 30s tick lands.
+    return SkinBuilder(
+      builder: (context, skins) => Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _load,
@@ -195,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     onTap: widget.onInvite,
                     child: DuetCard(
                       child: Row(children: [
-                        const PairRing(size: 32, hasPartner: false, strokeWidth: 2),
+                        const PairRing(size: 40, hasPartner: false, strokeWidth: 2.5),
                         const SizedBox(width: 14),
                         const Expanded(
                           child: Text(
@@ -219,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               if (widget.partnerName != null) ...[
                 DuetCard(
                   child: Row(children: [
-                    const PairRing(size: 32, strokeWidth: 2),
+                    const PairRing(size: 40, strokeWidth: 2.5),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text('You and ${widget.partnerName}',
@@ -315,11 +318,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(28),
         child: Ink(
-          decoration: const BoxDecoration(
-            gradient: DuetColors.wash,
-            borderRadius: BorderRadius.all(Radius.circular(28)),
+          decoration: BoxDecoration(
+            gradient: SkinColors.instance.wash,
+            borderRadius: const BorderRadius.all(Radius.circular(28)),
             boxShadow: [
-              BoxShadow(color: Color(0x40F0A8C8), blurRadius: 20, offset: Offset(0, 8)),
+              BoxShadow(
+                color: SkinColors.instance.accent.withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
             ],
           ),
           child: InkWell(
@@ -342,6 +349,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -386,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                PairRing(size: 52, hasPartner: alarm.ringTarget != RingTarget.owner),
+                PairRing(size: 84, hasPartner: alarm.ringTarget != RingTarget.owner),
               ],
             ),
             const SizedBox(height: 16),
@@ -407,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: EdgeInsets.only(
             top: MediaQuery.of(context).size.height * 0.20, bottom: 40),
         child: Column(children: [
-          const PairRing(size: 64, hasPartner: false),
+          const PairRing(size: 88, hasPartner: false),
           const SizedBox(height: 22),
           const Text('No alarms yet.',
               style: TextStyle(fontSize: 20, color: DuetColors.text)),
@@ -478,14 +486,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Switch(
                   value: alarm.enabled,
                   activeThumbColor: DuetColors.amberInk,
-                  activeTrackColor: DuetColors.amber,
+                  activeTrackColor: SkinColors.instance.accent,
                   inactiveThumbColor: const Color(0xFF5A4C44),
                   inactiveTrackColor: const Color(0xFF2E2621),
                   trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                   thumbIcon: WidgetStateProperty.resolveWith((states) =>
                       states.contains(WidgetState.selected)
-                          ? const Icon(Icons.favorite_rounded,
-                              size: 14, color: DuetColors.amber)
+                          ? Icon(SkinColors.instance.mineSkin.icon,
+                              size: 14, color: SkinColors.instance.accent)
                           : null),
                   onChanged: (v) async {
                     await _repo.setEnabled(alarm.id, v);
