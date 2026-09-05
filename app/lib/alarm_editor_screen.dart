@@ -71,29 +71,17 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
     if (mounted) setState(() => _soundTitle = 'Custom sound');
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: _hour, minute: _minute),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.dark(
-            primary: SkinColors.instance.accent,
-            onPrimary: DuetColors.amberInk,
-            surface: DuetColors.surface,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() { _hour = picked.hour; _minute = picked.minute; });
-    }
-  }
+  // The platform showTimePicker is gone: it opened as a stock modal in the
+  // middle of an otherwise bespoke screen, and the canvases specify the hero
+  // time edited right where it stands. Hour and minute each get a chevron
+  // pair; both wrap (23 -> 0, 59 -> 0).
+  void _bumpHour(int delta) => setState(() => _hour = (_hour + delta + 24) % 24);
+
+  void _bumpMinute(int delta) => setState(() => _minute = (_minute + delta + 60) % 60);
 
   Future<void> _pickSound() async {
     final chosen = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => SoundPickerScreen(selected: _soundRef)),
+      DuetPageRoute(builder: (_) => SoundPickerScreen(selected: _soundRef)),
     );
     if (chosen != null) {
       setState(() => _soundRef = chosen);
@@ -165,34 +153,33 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 4, 18, 40),
         children: [
-          Center(
-            child: InkWell(
-              onTap: _pickTime,
-              borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                          fontSize: 74,
-                          fontWeight: FontWeight.w200,
-                          letterSpacing: 2,
-                          color: DuetColors.text),
-                    ),
-                    const SizedBox(width: 8),
-                    const Padding(
-                      padding: EdgeInsets.only(top: 14),
-                      child: HeartAccent(size: 18),
-                    ),
-                  ],
-                ),
+          Column(
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}',
+                    style: const TextStyle(
+                        fontSize: 74,
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: 2,
+                        color: DuetColors.text,
+                        fontFeatures: [FontFeature.tabularFigures()]),
+                  ),
+                  const SizedBox(width: 8),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 14),
+                    child: HeartAccent(size: 18),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 6),
+              _timeSteppers(),
+            ],
           ),
+          const SizedBox(height: 10),
           Center(
             child: Text(preview,
                 style: const TextStyle(fontSize: 13.5, color: DuetColors.dim)),
@@ -226,21 +213,25 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
 
           const SectionLabel('Sound'),
           const SizedBox(height: 10),
-          _tappableRow(
-            icon: Icons.graphic_eq,
-            title: 'You will hear',
-            value: _soundTitle,
-            onTap: _pickSound,
-          ),
-          const SizedBox(height: 8),
-          Opacity(
-            opacity: 0.45,
-            child: _tappableRow(
-              icon: Icons.person_outline,
-              title: 'They will hear',
-              value: 'Once you pair',
-              onTap: null,
-            ),
+          // No CrossAxisAlignment.stretch here: a stretched Row needs a
+          // bounded height and a ListView's is infinite -- the first build
+          // of this threw and took the whole viewport blank with it. The
+          // cards are structurally identical, so their natural heights match.
+          Row(
+            children: [
+              Expanded(
+                child: _soundCard(
+                  title: 'You will hear',
+                  value: _soundTitle,
+                  active: true,
+                  onTap: _pickSound,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _soundCard(title: 'They will hear', value: 'Once you pair'),
+              ),
+            ],
           ),
           const SizedBox(height: 18),
 
@@ -254,11 +245,15 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           _snoozeRow(),
 
           if (!_isNew) ...[
-            const SizedBox(height: 30),
-            TextButton(
-              onPressed: _delete,
-              child: const Text('Delete this alarm',
-                  style: TextStyle(color: DuetColors.danger, fontSize: 15)),
+            const SizedBox(height: 34),
+            // Deleting a shared alarm reaches the partner's phone too -- that
+            // is exactly the class of action the canvases say must be
+            // press-and-hold, not a tap you can sleep-fire.
+            PressAndHoldButton(
+              label: 'Hold to delete',
+              icon: Icons.delete_outline_rounded,
+              destructive: true,
+              onComplete: _delete,
             ),
           ],
         ],
@@ -321,31 +316,105 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
     );
   }
 
-  Widget _tappableRow({
-    required IconData icon,
+  /// Chevron pair + value for one segment of the hero time. Wrapping is
+  /// handled by the bump functions above.
+  Widget _timeSteppers() => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _timeStepper(
+            'HOUR',
+            _hour.toString().padLeft(2, '0'),
+            () => _bumpHour(1),
+            () => _bumpHour(-1),
+          ),
+          const SizedBox(width: 20),
+          _timeStepper(
+            'MIN',
+            _minute.toString().padLeft(2, '0'),
+            () => _bumpMinute(1),
+            () => _bumpMinute(-1),
+          ),
+        ],
+      );
+
+  Widget _timeStepper(String label, String value, VoidCallback onUp, VoidCallback onDown) =>
+      Column(
+        children: [
+          _chevronButton(Icons.keyboard_arrow_up_rounded, onUp),
+          Container(
+            width: 58,
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: DuetColors.surface.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: DuetColors.line.withValues(alpha: 0.6)),
+            ),
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.8,
+                    color: DuetColors.muted,
+                    fontFeatures: [FontFeature.tabularFigures()])),
+          ),
+          _chevronButton(Icons.keyboard_arrow_down_rounded, onDown),
+        ],
+      );
+
+  Widget _chevronButton(IconData icon, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: SizedBox(
+          width: 58,
+          height: 30,
+          child: Icon(icon, size: 22, color: DuetColors.dim),
+        ),
+      );
+
+  /// The canvas's side-by-side sound cards. Yours is alive -- a waveform, your
+  /// accent, a chevron -- and theirs is the quiet promise of the feature.
+  Widget _soundCard({
     required String title,
     required String value,
+    bool active = false,
     VoidCallback? onTap,
   }) =>
       Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           child: DuetCard(
-            child: Row(children: [
-              Icon(icon, size: 19, color: DuetColors.dim),
-              const SizedBox(width: 13),
-              Expanded(
-                  child: Text(title,
-                      style: const TextStyle(color: DuetColors.text, fontSize: 15))),
-              Text(value,
-                  style: const TextStyle(color: DuetColors.muted, fontSize: 14.5)),
-              if (onTap != null) ...[
-                const SizedBox(width: 6),
-                const Icon(Icons.chevron_right, size: 18, color: DuetColors.faint),
+            border: active ? SkinColors.instance.accent.withValues(alpha: 0.3) : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(active ? Icons.graphic_eq : Icons.person_outline,
+                      size: 14, color: active ? SkinColors.instance.accent : DuetColors.faint),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(title.toUpperCase(),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 10.5,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w600,
+                            color: active ? DuetColors.muted : DuetColors.faint)),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                WaveformBars(count: 6, height: 16, color: active ? null : DuetColors.faint),
+                const SizedBox(height: 10),
+                Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        color: active ? DuetColors.text : DuetColors.faint)),
               ],
-            ]),
+            ),
           ),
         ),
       );

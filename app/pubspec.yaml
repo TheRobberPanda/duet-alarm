@@ -37,6 +37,13 @@ dependencies:
   supabase_flutter: ^2.17.2
   shared_preferences: ^2.5.5
 
+  # QR pairing (the canvases' "QR option"). qr_flutter renders the invite code
+  # as a code the partner's camera can read; mobile_scanner reads theirs.
+  # mobile_scanner is the one heavyweight dep in the app (it drags in ML Kit) --
+  # if a build ever breaks on it, QR display + manual entry is the fallback.
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -59,16 +66,36 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # The display face, and the app's only bundled font. Montserrat's geometric,
-  # near-circular counters rhyme with the pair ring, which is the whole visual
-  # idea -- so it earns its place on the one thing it is used for: the time.
-  # Everything else stays on the device's own sans (see theme.dart), which
-  # costs nothing and looks native. SIL Open Font License 1.1.
+  # Three faces, each with one job. Montserrat ExtraBold stays the time-only
+  # display face (its near-circular counters rhyme with the pair ring -- the
+  # whole visual idea). Hanken Grotesk takes over the UI so the app finally has
+  # a typographic identity of its own instead of whatever sans the device ships
+  # (MiSans/Roboto/One UI Sans all render Duet differently); it is a variable
+  # font but we bundle static instances so Flutter maps weights without
+  # FontVariation. Instrument Serif is the one celebratory voice -- wake
+  # receipt headline and nothing else. All SIL Open Font License 1.1.
   fonts:
     - family: Duet Display
       fonts:
         - asset: assets/fonts/Montserrat-ExtraBold.ttf
           weight: 800
+    - family: Duet UI
+      fonts:
+        - asset: assets/fonts/HankenGrotesk-Light.ttf
+          weight: 300
+        - asset: assets/fonts/HankenGrotesk-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/HankenGrotesk-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/HankenGrotesk-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/HankenGrotesk-Bold.ttf
+          weight: 700
+    - family: Duet Serif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
+        - asset: assets/fonts/InstrumentSerif-Italic.ttf
+          style: italic
 
   # To add assets to your application, add an assets section, like this:
   # assets:

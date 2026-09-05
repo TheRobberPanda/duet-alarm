@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alarm.dart';
 import 'alarm_editor_screen.dart';
@@ -10,12 +11,19 @@ import 'main.dart' show kBackendEnabled;
 import 'pair_repository.dart';
 import 'settings_screen.dart';
 import 'theme.dart';
+import 'wake_receipt_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.partnerName, this.onInvite});
+  const HomeScreen({super.key, this.partnerName, this.partnerTimezone, this.onInvite});
 
   /// Null while solo -- either not signed in, or not yet paired.
   final String? partnerName;
+
+  /// The partner's IANA zone from their profile ('Europe/Lisbon'). The strip
+  /// shows the city so you can picture where they are waking up; computing
+  /// their actual local time would need a tz database in the app, which is a
+  /// heavy dependency for one label.
+  final String? partnerTimezone;
 
   /// Non-null only when there is no partner yet: takes them back to pairing.
   final VoidCallback? onInvite;
@@ -80,6 +88,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _partnerDismissed = counts['partner'];
         });
       }
+
+      // The wake receipt: shown once per ring, then never again. Marking seen
+      // on POP -- if the app dies mid-viewing, showing it again is the lesser
+      // wrong versus never showing it.
+      try {
+        final receipt = await PairRepository.instance().latestWake();
+        if (receipt != null && mounted) {
+          final prefs = await SharedPreferences.getInstance();
+          final seenKey = 'receipt_seen_${receipt.sessionId}';
+          if (!prefs.containsKey(seenKey)) {
+            await prefs.setBool(seenKey, true);
+            if (mounted) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                Navigator.of(context).push(
+                  DuetPageRoute(
+                    builder: (_) => WakeReceiptScreen(
+                      data: receipt,
+                      partnerName: widget.partnerName!,
+                    ),
+                  ),
+                );
+              });
+            }
+          }
+        }
+      } catch (_) {
+        // A receipt that fails to load is a missing bonus, not an error the
+        // home screen should wear.
+      }
     }
   }
 
@@ -121,11 +159,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return 'in under a minute';
   }
 
+  /// 'Europe/Lisbon' -> 'Lisbon'; 'UTC' stays 'UTC'. Best effort -- the strip
+  /// label is a whisper, not data you set your day by.
+  String? get _partnerCity {
+    final tz = widget.partnerTimezone;
+    if (tz == null || !tz.contains('/')) return null;
+    return tz.split('/').last.replaceAll('_', ' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: SkinColors.instance.accent)),
+      // A skeleton that mirrors the real layout, so the screen arrives in
+      // place instead of a spinner being swapped for content.
+      return const Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(18, 24, 18, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Skeleton(width: 88, height: 30, radius: 9),
+                  Spacer(),
+                  Skeleton(width: 42, height: 42, radius: 21),
+                  SizedBox(width: 10),
+                  Skeleton(width: 42, height: 42, radius: 21),
+                ]),
+                SizedBox(height: 44),
+                Center(child: Skeleton(width: 268, height: 268, radius: 134)),
+                SizedBox(height: 30),
+                Center(child: Skeleton(width: 120, height: 18, radius: 9)),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -142,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           color: SkinColors.instance.accent,
           backgroundColor: DuetColors.surface,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 110),
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
             children: [
               Row(
                 children: [
@@ -152,39 +220,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       children: [
                         Text('Duet',
                             style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 27,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
                                 color: DuetColors.text)),
                         SizedBox(width: 8),
-                        HeartAccent(size: 16),
+                        HeartAccent(size: 15),
                       ],
                     ),
                   ),
-                  if (kBackendEnabled)
-                    IconButton(
-                      icon: const Icon(Icons.settings_outlined,
-                          color: DuetColors.dim, size: 22),
-                      tooltip: 'Settings',
-                      onPressed: () => Navigator.of(context).push(
-                        DuetPageRoute(
-                          builder: (_) => SettingsScreen(
-                            onSignedOut: () => Navigator.of(context)
-                                .popUntil((route) => route.isFirst),
-                          ),
+                  if (kBackendEnabled) _headerButton(Icons.settings_outlined, 'Settings', () {
+                    Navigator.of(context).push(
+                      DuetPageRoute(
+                        builder: (_) => SettingsScreen(
+                          onSignedOut: () => Navigator.of(context)
+                              .popUntil((route) => route.isFirst),
                         ),
                       ),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.health_and_safety_outlined,
-                        color: DuetColors.dim, size: 22),
-                    tooltip: 'Alarm health',
-                    onPressed: () => Navigator.of(context).push(
+                    );
+                  }),
+                  _headerButton(Icons.health_and_safety_outlined, 'Alarm health', () {
+                    Navigator.of(context).push(
                       DuetPageRoute(builder: (_) => const DiagnosticsScreen()),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ),
               const SizedBox(height: 14),
+
+              // The partner awareness strip -- the canvas's standing header:
+              // the two of you overlapped, their city, and whether the line
+              // to them is healthy. Solo screens simply do not get one.
+              if (widget.partnerName != null) ...[
+                _partnerStrip(),
+                const SizedBox(height: 16),
+              ],
 
               // Only shown when sync was attempted AND failed. Silence here
               // would let someone believe an edit reached their partner when it
@@ -221,10 +291,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
               if (_repo.sync != null && !_repo.lastSyncOk) ...[
                 DuetCard(
-                  border: SkinColors.instance.accent.withValues(alpha: 0.5),
+                  border: DuetColors.danger.withValues(alpha: 0.45),
+                  color: DuetColors.surface,
                   child: Row(children: [
-                    Icon(Icons.cloud_off_outlined,
-                        color: SkinColors.instance.accent, size: 20),
+                    const Icon(Icons.cloud_off_outlined,
+                        color: DuetColors.danger, size: 20),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
@@ -253,19 +324,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 14),
               ],
-              if (widget.partnerName != null) ...[
-                // A line, not a card: the dial above already shows the two of
-                // you in your own colors. This only adds the name.
-                Center(
-                  child: Text(
-                    'You and ${widget.partnerName}',
-                    style: const TextStyle(
-                        fontSize: 13.5, color: DuetColors.dim, letterSpacing: 0.2),
-                  ),
-                ),
-                const SizedBox(height: 22),
-              ],
-
               if (next == null && alarms.isNotEmpty) ...[
                 DuetCard(
                   child: Text(
@@ -327,45 +385,92 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       ),
-      floatingActionButton: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(28),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: SkinColors.instance.wash,
-            borderRadius: const BorderRadius.all(Radius.circular(28)),
-            boxShadow: [
-              BoxShadow(
-                color: SkinColors.instance.accent.withValues(alpha: 0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(28),
-            onTap: () => _edit(),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.auto_awesome, color: DuetColors.amberInk, size: 18),
-                  SizedBox(width: 9),
-                  Text('New alarm',
-                      style: TextStyle(
-                          color: DuetColors.amberInk,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15.5)),
-                ],
-              ),
-            ),
-          ),
-        ),
+      // The canvas's full-width bottom CTA, not a FAB -- adding an alarm is
+      // the one primary action on this screen and deserves a whole row.
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+        child: DuetButton('New alarm', icon: Icons.add_rounded, filled: true, onTap: () => _edit()),
       ),
       ),
     );
   }
+
+  /// Glass circular header action -- the stock IconButton was the last
+  /// platform-styled thing on this screen.
+  Widget _headerButton(IconData icon, String tooltip, VoidCallback onTap) => Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: IconButton(
+          icon: Icon(icon, color: DuetColors.muted, size: 21),
+          tooltip: tooltip,
+          onPressed: onTap,
+          style: IconButton.styleFrom(
+            backgroundColor: DuetColors.surface.withValues(alpha: 0.6),
+            side: BorderSide(color: DuetColors.line.withValues(alpha: 0.6)),
+          ),
+        ),
+      );
+
+  /// The standing "the two of you" header from the canvas: overlapping skin
+  /// avatars, their city, and a live sync dot. Kept to one quiet glass row --
+  /// it frames the dial below rather than competing with it.
+  Widget _partnerStrip() => SkinBuilder(
+        builder: (context, skins) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: DuetColors.surface.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: DuetColors.line.withValues(alpha: 0.5)),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 54,
+                height: 36,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      child: AvatarBadge(
+                          icon: (skins.partnerSkin ?? skins.mineSkin).icon,
+                          color: skins.partner,
+                          size: 36),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: AvatarBadge(icon: skins.mineSkin.icon, size: 36),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('You and ${widget.partnerName}',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500, color: DuetColors.text)),
+                    Text(
+                      _partnerCity == null
+                          ? 'Alarms ring on both phones'
+                          : 'Alarms ring on both phones · $_partnerCity',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: DuetColors.dim),
+                    ),
+                  ],
+                ),
+              ),
+              if (kBackendEnabled && _repo.sync != null)
+                DuetPill(
+                  _repo.lastSyncOk ? 'Synced' : 'Offline',
+                  dot: true,
+                  color: _repo.lastSyncOk ? DuetColors.success : DuetColors.danger,
+                ),
+            ],
+          ),
+        ),
+      );
 
   /// THE DIAL -- the screen's hero and the app's signature.
   ///
@@ -384,51 +489,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
-          SizedBox(
-            width: 268,
-            height: 268,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PairRing(
-                  size: 268,
-                  strokeWidth: 5,
-                  mineOn: alarm.enabled,
-                  hasPartner: alarm.partnerEnabled &&
-                      alarm.ringTarget != RingTarget.owner,
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SectionLabel('Next alarm'),
-                    const SizedBox(height: 10),
-                    // The one place the display face appears. Montserrat's
-                    // circular counters echo the ring it sits inside.
-                    Text(
-                      alarm.timeLabel,
-                      style: const TextStyle(
-                        fontFamily: 'Duet Display',
-                        fontSize: 58,
-                        height: 1,
-                        letterSpacing: -1.5,
-                        color: DuetColors.text,
+          HaloGlow(
+            size: 430,
+            child: SizedBox(
+              width: 268,
+              height: 268,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  PairRing(
+                    size: 268,
+                    strokeWidth: 5,
+                    mineOn: alarm.enabled,
+                    hasPartner: alarm.partnerEnabled &&
+                        alarm.ringTarget != RingTarget.owner,
+                    // Paired but sitting this one out -> their arc draws
+                    // dashed, the canvas's "not yet" state. Owner-only rings
+                    // genuinely exclude them, so no arc at all.
+                    partnerExists: widget.partnerName != null &&
+                        alarm.ringTarget != RingTarget.owner,
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SectionLabel('Next alarm'),
+                      const SizedBox(height: 10),
+                      // The one place the display face appears. Montserrat's
+                      // circular counters echo the ring it sits inside.
+                      Text(
+                        alarm.timeLabel,
+                        style: DuetText.time(58, tracking: -1.5),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 168),
-                      child: Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13, color: DuetColors.muted, height: 1.3),
+                      const SizedBox(height: 8),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 168),
+                        child: Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13, color: DuetColors.muted, height: 1.3),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 18),
@@ -447,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: EdgeInsets.only(
             top: MediaQuery.of(context).size.height * 0.20, bottom: 40),
         child: Column(children: [
-          const PairRing(size: 88, hasPartner: false),
+          HaloGlow(size: 220, child: PairRing(size: 88, hasPartner: false)),
           const SizedBox(height: 22),
           const Text('No alarms yet.',
               style: TextStyle(fontSize: 20, color: DuetColors.text)),
@@ -466,28 +573,48 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _alarmRow(Alarm alarm) {
     final next = alarm.nextFireAfter(DateTime.now());
+    final on = alarm.enabled;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           onTap: () => _edit(alarm),
           child: Opacity(
-            opacity: alarm.enabled ? 1 : 0.45,
-            child: Container(
+            opacity: on ? 1 : 0.5,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOut,
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               decoration: BoxDecoration(
-                color: DuetColors.surface.withValues(alpha: 0.55),
+                // Switched-on rows catch a little of the pair gradient --
+                // lit like the cards but a stop quieter, so the dial above
+                // stays the hero.
+                gradient: on
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [DuetColors.surfaceTop, DuetColors.surfaceBottom],
+                      )
+                    : null,
+                color: on ? null : DuetColors.surface.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: (on ? SkinColors.instance.accent : DuetColors.line)
+                      .withValues(alpha: on ? 0.14 : 0.5),
+                ),
               ),
               child: Row(children: [
                 PairRing(
                   size: 26,
-                  strokeWidth: 2,
-                  mineOn: alarm.enabled,
+                  strokeWidth: 2.5,
+                  animate: false,
+                  mineOn: on,
                   hasPartner: alarm.partnerEnabled &&
+                      alarm.ringTarget != RingTarget.owner,
+                  partnerExists: widget.partnerName != null &&
                       alarm.ringTarget != RingTarget.owner,
                 ),
                 const SizedBox(width: 14),
@@ -497,12 +624,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       Row(crossAxisAlignment: CrossAxisAlignment.baseline,
                           textBaseline: TextBaseline.alphabetic, children: [
+                        // Tabular figures: a list of times ticking between
+                        // screens must never jitter.
                         Text(alarm.timeLabel,
-                            style: const TextStyle(
-                                fontSize: 27,
+                            style: TextStyle(
+                                fontSize: 28,
                                 fontWeight: FontWeight.w300,
                                 letterSpacing: 0.5,
-                                color: DuetColors.text)),
+                                color: DuetColors.text,
+                                fontFeatures: const [FontFeature.tabularFigures()])),
                         if (alarm.label.isNotEmpty) ...[
                           const SizedBox(width: 9),
                           Expanded(
@@ -515,7 +645,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ]),
                       const SizedBox(height: 3),
                       Text(
-                        alarm.enabled
+                        on
                             ? '${alarm.scheduleLabel}${next == null ? '' : ' · ${_until(next)}'}'
                             : 'Off',
                         style: const TextStyle(fontSize: 12.5, color: DuetColors.dim),
@@ -523,18 +653,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                Switch(
-                  value: alarm.enabled,
-                  activeThumbColor: DuetColors.amberInk,
-                  activeTrackColor: SkinColors.instance.accent,
-                  inactiveThumbColor: const Color(0xFF5A4C44),
-                  inactiveTrackColor: const Color(0xFF2E2621),
-                  trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                  thumbIcon: WidgetStateProperty.resolveWith((states) =>
-                      states.contains(WidgetState.selected)
-                          ? Icon(SkinColors.instance.mineSkin.icon,
-                              size: 14, color: SkinColors.instance.accent)
-                          : null),
+                DuetSwitch(
+                  value: on,
                   onChanged: (v) async {
                     await _repo.setEnabled(alarm.id, v);
                     if (mounted) setState(() {});

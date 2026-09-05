@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "references": {
+    "design": {
+      "path": "design",
+      "description": "Duet design canvases (.dc.html artboards + canvas.json + DESIGN-PROMPT.md) — the visual spec for UI work"
+    },
+    "docs": {
+      "path": "docs",
+      "description": "Product docs; 02-architecture.md and 09-decisions.md are binding ADRs"
+    }
+  }
+}

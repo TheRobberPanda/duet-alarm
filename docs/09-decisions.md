@@ -246,3 +246,53 @@ see, not what their partner sees. Three themes are free; six ship in a $3.99 pac
 Per-person application means a theme is a personal expression, which is what makes
 it worth paying for. Marketing must present this as personalization for everyone —
 gendering the feature in store copy would narrow the audience for no gain.
+
+---
+
+### ADR-014 — The UI identity is bundled: Hanken Grotesk, Instrument Serif, and the Plum Velvet component pass
+
+**Status:** Accepted
+
+**Context.** UI text previously rendered in whatever sans the device ships
+(MiSans / Roboto / One UI Sans), so Duet looked like a different app on every
+phone, and several screens still carried stock Material surfaces (the platform
+time picker and AlertDialog, raw SnackBars, bare spinners) that broke the
+deliberate plum world the moment they opened. The design canvases specify a
+full visual language the shipped screens only half-used.
+
+**Decision.** Bundle three typefaces with distinct jobs — Hanken Grotesk as
+"Duet UI" for everything, Montserrat ExtraBold kept as the time-only display
+face ("Duet Display"), Instrument Serif as the single celebratory voice (wake
+receipt) — and finish the component pass: gradient-filled cards, halo glows
+behind hero elements, dashed "not yet" arcs, glass pills, press-and-hold
+destructive actions, skeletons instead of spinners, and bespoke dialogs and
+snackbars. The ringing screen mirrors the same palette constants by hand
+(they cannot read Dart state) and its typeface is loaded from flutter_assets
+with a hard fallback to the system light sans.
+
+**Consequences.** The app is ~440 KB of TTFs heavier and mobile_scanner pulls
+ML Kit into the APK (see ADR-015). Palette changes now have two copies to
+keep in sync — the mirrored constants in RingingActivity.kt are annotated with
+the DuetColors token they shadow. Stock platform pickers/dialogs are gone, so
+future Flutter theme changes apply everywhere at once.
+
+---
+
+### ADR-015 — QR pairing via qr_flutter + mobile_scanner
+
+**Status:** Accepted
+
+**Context.** Pairing is the growth engine (docs/11) and the canvases specify a
+QR option; typing six characters across a table is friction the camera can
+remove.
+
+**Decision.** Render the invite code as a QR (qr_flutter, pure Dart) on the
+invite card, and scan the partner's with mobile_scanner (which brings ML Kit
+and camera permission with it). A scanned code feeds straight into the same
+`redeem_pair_invite` path as typed entry, so all authorization stays server-side.
+
+**Consequences.** mobile_scanner is the app's first heavyweight native
+dependency; if it ever breaks a build, the documented fallback is QR display +
+manual entry, which is the pre-2026-09 state and loses nothing but convenience.
+The camera flow adds a permission prompt only on the scan path, not at install
+or on the alarm path (ADR-001 is untouched: pairing was already network-bound).

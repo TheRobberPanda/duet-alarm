@@ -1,5 +1,6 @@
 package com.duet.alarm
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
@@ -7,10 +8,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -24,12 +28,24 @@ import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.*
+
+// Hand-mirrored from Flutter's DuetColors (theme.dart). The ringing screen
+// cannot read Dart state, so these constants shadow it -- when you change the
+// palette in theme.dart, change them here too. Names below note the token.
+private val BG_DEEP = Color.parseColor("#150F14")      // DuetColors.bgDeep
+private val SURFACE = Color.parseColor("#251A22")      // DuetColors.surface
+private val LINE = Color.parseColor("#402C38")         // DuetColors.line
+private val TEXT = Color.parseColor("#F9EBF3")         // DuetColors.text
+private val MUTED = Color.parseColor("#CBA8BE")        // DuetColors.muted
+private val DIM = Color.parseColor("#937284")          // DuetColors.dim
+private val ON_ACCENT = Color.parseColor("#3D1526")    // DuetColors.amberInk
 
 /**
  * Deliberately NOT a Flutter screen.
@@ -50,7 +66,8 @@ class RingingActivity : Activity() {
     private var soundRef = "default"
     private var label = "Alarm"
     private var pairId: String? = null
-    private var awarenessView: TextView? = null
+    private var awarenessWrap: View? = null
+    private lateinit var awarenessText: TextView
     private val pollHandler = Handler(Looper.getMainLooper())
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
@@ -106,15 +123,19 @@ class RingingActivity : Activity() {
     }
 
     private fun showAwareness(state: String?) {
-        val view = awarenessView ?: return
+        val wrap = awarenessWrap ?: return
         val text = when (state) {
             "ringing" -> "They're ringing too"
             "snoozed" -> "They snoozed"
             "dismissed" -> "They're up"
             else -> null // no row yet, or the request failed -- say nothing rather than guess
         }
-        view.text = text ?: ""
-        view.visibility = if (text == null) View.GONE else View.VISIBLE
+        if (text == null) {
+            wrap.visibility = View.GONE
+        } else {
+            awarenessText.text = text
+            wrap.visibility = View.VISIBLE
+        }
     }
 
     /** The one bit of feedback a gesture needs when the screen is about to
@@ -186,7 +207,7 @@ class RingingActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(Color.parseColor("#150F14"))
+            setBackgroundColor(BG_DEEP)
             setPadding(dp(24), dp(40), dp(24), dp(28))
         }
 
@@ -212,24 +233,33 @@ class RingingActivity : Activity() {
         }
         inner.addView(TextView(this).apply {
             text = label.uppercase()
-            setTextColor(Color.parseColor("#A88B9B"))
+            setTextColor(DIM)
             textSize = 12f
             letterSpacing = 0.22f
             gravity = Gravity.CENTER
         })
         inner.addView(TextView(this).apply {
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            setTextColor(Color.parseColor("#FBF0F6"))
-            textSize = 62f
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            letterSpacing = 0.03f
+            setTextColor(TEXT)
+            textSize = 58f
+            // The same display face the Flutter dial uses. It ships inside the
+            // APK's flutter_assets even when no engine ever runs, but the path
+            // is not something this screen may ever crash over -- any failure
+            // falls back to the system's light sans and the alarm still reads.
+            typeface = runCatching {
+                Typeface.createFromAsset(
+                    assets,
+                    "flutter_assets/assets/fonts/Montserrat-ExtraBold.ttf"
+                )
+            }.getOrDefault(Typeface.create("sans-serif-light", Typeface.NORMAL))
+            letterSpacing = 0.02f
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             topMargin = dp(6)
         })
         inner.addView(TextView(this).apply {
             text = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
-            setTextColor(Color.parseColor("#8F7A88"))
+            setTextColor(MUTED)
             textSize = 13f
             gravity = Gravity.CENTER
         })
@@ -241,15 +271,26 @@ class RingingActivity : Activity() {
         root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(dial, LinearLayout.LayoutParams(dp(268), dp(268)))
 
-        // Milestone 4's live awareness strip. Empty and GONE until polling finds
-        // a partner row to report -- see startAwarenessPolling().
-        awarenessView = TextView(this).apply {
+        // Milestone 4's live awareness strip, dressed as the canvas's glassy
+        // pill instead of bare text. Empty and GONE until polling finds a
+        // partner row to report -- see startAwarenessPolling().
+        awarenessText = TextView(this).apply {
             setTextColor(AuthStore.skinPartner(this@RingingActivity, Color.parseColor("#F0A8C8")))
-            textSize = 14f
+            textSize = 13.5f
             gravity = Gravity.CENTER
+        }
+        awarenessWrap = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                cornerRadius = dp(19).toFloat()
+                setColor(ColorUtils.setAlphaComponent(SURFACE, 200))
+                setStroke(dp(1), LINE)
+            }
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            addView(awarenessText)
             visibility = View.GONE
         }
-        root.addView(awarenessView, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+        root.addView(awarenessWrap, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             topMargin = dp(18)
         })
 
@@ -263,12 +304,7 @@ class RingingActivity : Activity() {
 
         if (snoozesLeft > 0) {
             controls.addView(
-                actionButton(
-                    "Snooze",
-                    Color.parseColor("#33232D"),
-                    Color.parseColor("#F5EDE6"),
-                    outlined = true
-                ) { snooze() },
+                actionButton("Snooze", SURFACE, TEXT, outlined = true) { snooze() },
                 LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; rightMargin = dp(6) }
             )
         }
@@ -276,7 +312,7 @@ class RingingActivity : Activity() {
             actionButton(
                 "Dismiss",
                 AuthStore.skinMine(this, Color.parseColor("#F0A8C8")),
-                Color.parseColor("#3D1526"),
+                ON_ACCENT,
                 outlined = false
             ) { dismiss() }
                 .apply {
@@ -301,7 +337,7 @@ class RingingActivity : Activity() {
                 },
                 "hold Dismiss to end it for both".takeIf { pairId != null },
             ).joinToString(" · ")
-            setTextColor(Color.parseColor("#776273"))
+            setTextColor(DIM)
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(dp(20), dp(14), dp(20), 0)
@@ -315,12 +351,13 @@ class RingingActivity : Activity() {
     ) = Button(this).apply {
         text = label
         isAllCaps = false
-        textSize = 18f
+        textSize = 17f
+        letterSpacing = 0.02f
         setTextColor(fg)
         background = GradientDrawable().apply {
-            cornerRadius = dp(20).toFloat()
+            cornerRadius = dp(24).toFloat()
             setColor(bg)
-            if (outlined) setStroke(dp(1), Color.parseColor("#4A3540"))
+            if (outlined) setStroke(dp(1), LINE)
         }
         stateListAnimator = null
         setOnClickListener { onClick() }
@@ -362,6 +399,11 @@ class RingingActivity : Activity() {
 /**
  * The two-tone ring, drawn rather than bundled so it scales to any density and
  * needs no asset. Right half lavender (you), left half pink (them).
+ *
+ * Mirrors the Flutter PairRing's canvas behaviour: a slow scale-plus-opacity
+ * breathe (the canvas's ringBreathe keyframe) and a soft radial halo of the
+ * two skin colours standing behind the dial. All of it is a couple of Paints
+ * and one animator -- nothing here can fail in a way that stops the alarm.
  */
 private class PairRingView(
     context: Context,
@@ -370,7 +412,7 @@ private class PairRingView(
 ) : View(context) {
     private val track = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.parseColor("#33232D")
+        color = LINE
     }
     private val you = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -383,7 +425,40 @@ private class PairRingView(
         color = themColor
     }
 
+    private val youHalo = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val themHalo = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // 0..1, slow, reversing -- the same 82-100% opacity and ~3.5% scale the
+    // Flutter ring breathes between.
+    private val breathe = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 3200
+        repeatMode = ValueAnimator.REVERSE
+        repeatCount = ValueAnimator.INFINITE
+        interpolator = AccelerateDecelerateInterpolator()
+        addUpdateListener { invalidate() }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        breathe.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        breathe.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    private fun haloPaint(paint: Paint, color: Int, cx: Float, cy: Float, radius: Float) {
+        paint.shader = RadialGradient(
+            cx, cy, radius,
+            ColorUtils.setAlphaComponent(color, 33),
+            ColorUtils.setAlphaComponent(color, 0),
+            Shader.TileMode.CLAMP
+        )
+    }
+
     override fun onDraw(canvas: Canvas) {
+        val t = if (breathe.isRunning) breathe.animatedValue as Float else 0f
         val stroke = width * 0.011f
         track.strokeWidth = stroke
         you.strokeWidth = stroke * 1.6f
@@ -391,9 +466,31 @@ private class PairRingView(
 
         val pad = stroke * 2f
         val rect = RectF(pad, pad, width - pad, height - pad)
+        val cx = width / 2f
+        val cy = height / 2f
 
+        // The halo: your colour up-right, theirs down-left, barely there --
+        // light standing behind the dial, the same trick the Flutter side's
+        // HaloGlow does.
+        val haloRadius = width / 2f
+        haloPaint(youHalo, you.color, cx + haloRadius * 0.22f, cy - haloRadius * 0.18f, haloRadius)
+        haloPaint(themHalo, them.color, cx - haloRadius * 0.24f, cy + haloRadius * 0.20f, haloRadius)
+        youHalo.alpha = (140 + 80 * t).toInt()
+        themHalo.alpha = (115 + 65 * t).toInt()
+        canvas.drawCircle(cx + haloRadius * 0.22f, cy - haloRadius * 0.18f, haloRadius, youHalo)
+        canvas.drawCircle(cx - haloRadius * 0.24f, cy + haloRadius * 0.20f, haloRadius, themHalo)
+
+        // Breathe: scale the ring about its centre and let the arcs' opacity
+        // ride with the same value.
+        val alpha = 0.82f + 0.18f * t
+        you.alpha = (alpha * 255).toInt()
+        them.alpha = (alpha * 255).toInt()
+        val scale = 1f + 0.035f * t
+        canvas.save()
+        canvas.scale(scale, scale, cx, cy)
         canvas.drawArc(rect, 0f, 360f, false, track)
         canvas.drawArc(rect, -90f, 180f, false, you)
         canvas.drawArc(rect, 90f, 180f, false, them)
+        canvas.restore()
     }
 }

@@ -44,11 +44,27 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     );
     await _refresh();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Test alarm set for ${d.inSeconds}s from now')),
-      );
+      showDuetSnackBar(context, 'Test alarm set for ${d.inSeconds}s from now',
+          icon: Icons.alarm_rounded);
     }
   }
+
+  // System monospace: evidence text is machine output and should look like
+  // machine output, but it still sits in a plum field -- so it goes on a dark
+  // inset slab rather than floating raw.
+  TextStyle _mono(Color color) => TextStyle(
+      color: color, fontSize: 11.5, height: 1.55, fontFamily: 'monospace');
+
+  Widget _monoSlab(String text, Color color) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: DuetColors.bgDeep.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: DuetColors.line.withValues(alpha: 0.5)),
+        ),
+        child: Text(text, style: _mono(color)),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -76,20 +92,26 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
             ),
             const SizedBox(height: 20),
 
-            if (h == null)
-              const DuetCard(
-                  child: Text('Checking…', style: TextStyle(color: DuetColors.dim)))
-            else ...[
+            if (h == null) ...[
+              const Skeleton(height: 64, radius: 20),
+              const SizedBox(height: 8),
+              const Skeleton(height: 64, radius: 20),
+              const SizedBox(height: 8),
+              const Skeleton(height: 64, radius: 20),
+            ] else ...[
               DuetCard(
                 border: h.problemCount > 0
-                    ? SkinColors.instance.accent.withValues(alpha: 0.5)
+                    ? DuetColors.danger.withValues(alpha: 0.5)
                     : null,
                 child: Row(children: [
                   Icon(
                     h.problemCount > 0
                         ? Icons.warning_amber_rounded
                         : Icons.check_circle_outline,
-                    color: h.problemCount > 0 ? SkinColors.instance.accent : DuetColors.teal,
+                    // Semantic, not decorative: warnings are danger red and
+                    // "all clear" is the sage -- neither is the skin accent,
+                    // which reads as personality, not status.
+                    color: h.problemCount > 0 ? DuetColors.danger : DuetColors.success,
                     size: 26,
                   ),
                   const SizedBox(width: 13),
@@ -117,7 +139,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               if (h.isAggressiveOem) ...[
                 const SizedBox(height: 8),
                 DuetCard(
-                  border: SkinColors.instance.accent.withValues(alpha: 0.35),
+                  border: DuetColors.danger.withValues(alpha: 0.35),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${h.manufacturer} — Autostart',
                         style: const TextStyle(color: DuetColors.text, fontSize: 15.5)),
@@ -142,7 +164,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               const SectionLabel('Missed alarms'),
               const SizedBox(height: 10),
               DuetCard(
-                border: SkinColors.instance.accent,
+                border: DuetColors.danger.withValues(alpha: 0.45),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text(
                     'These were due while the app was not running, so they did '
@@ -150,12 +172,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     style: TextStyle(color: DuetColors.text, fontSize: 14, height: 1.45),
                   ),
                   const SizedBox(height: 10),
-                  Text(h!.missedLog.trim(),
-                      style: TextStyle(
-                          color: SkinColors.instance.accent,
-                          fontSize: 11.5,
-                          height: 1.5,
-                          fontFamily: 'monospace')),
+                  _monoSlab(h!.missedLog.trim(), DuetColors.danger.withValues(alpha: 0.85)),
                 ]),
               ),
             ],
@@ -207,13 +224,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         children: [
           Text(label,
               style: const TextStyle(color: DuetColors.muted, fontSize: 13)),
-          const SizedBox(height: 4),
-          Text(value,
-              style: const TextStyle(
-                  color: DuetColors.dim,
-                  fontSize: 11.5,
-                  height: 1.5,
-                  fontFamily: 'monospace')),
+          const SizedBox(height: 6),
+          _monoSlab(value, DuetColors.muted),
         ],
       );
 
@@ -222,7 +234,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         child: DuetCard(
           child: Row(children: [
             Icon(ok ? Icons.check_circle_outline : Icons.error_outline,
-                color: ok ? DuetColors.teal : SkinColors.instance.accent, size: 20),
+                color: ok ? DuetColors.success : DuetColors.danger, size: 20),
             const SizedBox(width: 13),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -230,7 +242,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     style: const TextStyle(color: DuetColors.text, fontSize: 15)),
                 const SizedBox(height: 2),
                 Text(ok ? 'Allowed' : why,
-                    style: const TextStyle(color: DuetColors.dim, fontSize: 12.5)),
+                    style: TextStyle(
+                        color: ok ? DuetColors.dim : DuetColors.danger.withValues(alpha: 0.8),
+                        fontSize: 12.5)),
               ]),
             ),
             if (!ok)

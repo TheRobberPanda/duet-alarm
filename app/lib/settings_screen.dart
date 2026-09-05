@@ -162,32 +162,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String confirmLabel,
     bool danger = false,
   }) =>
-      showDialog<bool>(
+      showDuetDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: DuetColors.surfaceRaised,
-          title: Text(title, style: const TextStyle(color: DuetColors.text)),
-          content: Text(body,
-              style: const TextStyle(color: DuetColors.muted, height: 1.4)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel', style: TextStyle(color: DuetColors.dim)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(confirmLabel,
-                  style: TextStyle(color: danger ? DuetColors.danger : SkinColors.instance.accent)),
-            ),
-          ],
-        ),
+        title: title,
+        body: body,
+        actions: [
+          DuetDialogAction('Cancel', onPressed: () => Navigator.of(context).pop(false)),
+          DuetDialogAction(
+            confirmLabel,
+            destructive: danger,
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
       );
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: SkinColors.instance.accent)),
+      return const Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Skeleton(width: 92, height: 26, radius: 8),
+                SizedBox(height: 22),
+                Skeleton(height: 72, radius: 20),
+                SizedBox(height: 16),
+                Skeleton(height: 72, radius: 20),
+                SizedBox(height: 28),
+                Skeleton(width: 110, height: 26, radius: 8),
+                SizedBox(height: 16),
+                Skeleton(height: 120, radius: 20),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -205,10 +216,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: SafeArea(
         child: AbsorbPointer(
           absorbing: _busy,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
+          child: Stack(
             children: [
-              const SectionLabel('Your name'),
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
+                children: [
+                  const SectionLabel('Your name'),
               const SizedBox(height: 10),
               DuetCard(
                 child: Row(children: [
@@ -290,18 +303,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     ),
-                    Switch(
+                    DuetSwitch(
                       value: allowPartnerDismiss,
-                      activeThumbColor: DuetColors.amberInk,
-                      activeTrackColor: SkinColors.instance.accent,
-                      inactiveThumbColor: const Color(0xFF5A4C50),
-                      inactiveTrackColor: const Color(0xFF2E2129),
-                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                      thumbIcon: WidgetStateProperty.resolveWith((states) =>
-                          states.contains(WidgetState.selected)
-                              ? Icon(SkinColors.instance.mineSkin.icon,
-                                  size: 14, color: SkinColors.instance.accent)
-                              : null),
                       onChanged: _setAllowPartnerDismiss,
                     ),
                   ]),
@@ -323,32 +326,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            width: 52,
-                            height: 52,
+                            padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: skin.color.withValues(alpha: on ? 1 : 0.35),
                               border: on
-                                  ? Border.all(color: DuetColors.text, width: 2)
+                                  ? Border.all(color: skin.color, width: 1.6)
                                   : null,
                               boxShadow: on
-                                  ? [BoxShadow(color: skin.color.withValues(alpha: 0.5), blurRadius: 14)]
+                                  ? [BoxShadow(color: skin.color.withValues(alpha: 0.35), blurRadius: 16)]
                                   : null,
                             ),
-                            child: Center(
-                              child: AnimatedSkinIcon(
-                                skin: skin,
-                                size: 22,
-                                color: on
-                                    ? DuetColors.amberInk
-                                    : DuetColors.text.withValues(alpha: 0.6),
-                              ),
-                            ),
+                            child: _SkinPreview(skin: skin, selected: on),
                           ),
                           const SizedBox(height: 6),
                           Text(skin.label,
                               style: TextStyle(
                                   fontSize: 11.5,
+                                  fontWeight: on ? FontWeight.w600 : FontWeight.w400,
                                   color: on ? DuetColors.text : DuetColors.dim)),
                         ],
                       ),
@@ -390,10 +384,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
+                ],
+              ),
+              if (_busy)
+                // Busy veil: taps are absorbed by the [AbsorbPointer] above,
+                // and the veil makes that visible instead of the screen
+                // silently eating touches.
+                IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: 1,
+                    duration: const Duration(milliseconds: 180),
+                    child: Container(
+                      color: DuetColors.bgDeep.withValues(alpha: 0.45),
+                      alignment: Alignment.center,
+                      child: const CircularProgressIndicator(color: DuetColors.amber),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+/// A miniature two-tone ring painted with THIS skin as your half and the
+/// classic partner pink as theirs -- so picking a theme previews what your
+/// half of the ring will look like everywhere, instead of showing an abstract
+/// colour dot. The skin's own glyph rides inside when selected.
+class _SkinPreview extends StatelessWidget {
+  const _SkinPreview({required this.skin, required this.selected});
+
+  final DuetSkin skin;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 48,
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CustomPaint(
+              size: const Size(48, 48),
+              painter: _SkinPreviewPainter(
+                mine: skin.color,
+                partner: DuetColors.amber,
+              ),
+            ),
+            AnimatedSkinIcon(
+              skin: skin,
+              size: 18,
+              color: selected
+                  ? skin.color
+                  : DuetColors.text.withValues(alpha: 0.55),
+            ),
+          ],
+        ),
+      );
+}
+
+class _SkinPreviewPainter extends CustomPainter {
+  _SkinPreviewPainter({required this.mine, required this.partner});
+
+  final Color mine;
+  final Color partner;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final rect = Rect.fromCircle(center: c, radius: size.width / 2 - 2);
+
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..color = DuetColors.line;
+    canvas.drawCircle(c, rect.width / 2, track);
+
+    final minePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..color = mine;
+    canvas.drawArc(rect, -1.5708, 3.1416, false, minePaint);
+
+    final partnerPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..color = partner.withValues(alpha: 0.55);
+    canvas.drawArc(rect, 1.5708, 3.1416, false, partnerPaint);
+  }
+
+  @override
+  bool shouldRepaint(_SkinPreviewPainter old) => old.mine != mine || old.partner != partner;
 }

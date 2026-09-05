@@ -75,7 +75,17 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
         ],
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: SkinColors.instance.accent))
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              child: Column(
+                children: [
+                  for (var i = 0; i < 6; i++) ...[
+                    const Skeleton(height: 52, radius: 15),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 40),
               children: [
@@ -89,24 +99,37 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                 const SizedBox(height: 26),
                 DuetCard(
                   child: Row(children: [
-                    const Icon(Icons.mic_none, size: 20, color: DuetColors.dim),
-                    const SizedBox(width: 13),
-                    const Expanded(
-                      child: Text('Record your own voice',
-                          style: TextStyle(color: DuetColors.muted, fontSize: 15)),
-                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2F2519),
-                        borderRadius: BorderRadius.circular(12),
+                        shape: BoxShape.circle,
+                        color: SkinColors.instance.accent.withValues(alpha: 0.14),
+                        border: Border.all(
+                            color: SkinColors.instance.accent.withValues(alpha: 0.35)),
                       ),
-                      child: Text('LATER',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: SkinColors.instance.accent)),
+                      child: const Icon(Icons.mic_none,
+                          size: 18, color: DuetColors.muted),
                     ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Record your own voice',
+                              style: TextStyle(
+                                  color: DuetColors.muted,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500)),
+                          const SizedBox(height: 2),
+                          Text('Wake them up as you',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: SkinColors.instance.accent.withValues(alpha: 0.8))),
+                        ],
+                      ),
+                    ),
+                    DuetPill('Later', icon: Icons.lock_rounded),
                   ]),
                 ),
               ],
@@ -116,6 +139,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
 
   Widget _row(DeviceSound s) {
     final chosen = s.ref == _selected;
+    final playing = _playing == s.ref;
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: Material(
@@ -131,15 +155,25 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
               color: chosen ? DuetColors.surfaceRaised : DuetColors.surface,
               borderRadius: BorderRadius.circular(15),
               border: Border.all(
-                  color: chosen ? SkinColors.instance.accent : Colors.transparent, width: 1.4),
+                  color: chosen
+                      ? SkinColors.instance.accent
+                      : Colors.transparent,
+                  width: 1.4),
+              // Skin-aware: the glow used to be hard-coded to the old pink
+              // and ignored whichever skin you had picked.
               boxShadow: chosen
-                  ? const [BoxShadow(color: Color(0x30F0A8C8), blurRadius: 14)]
+                  ? [
+                      BoxShadow(
+                        color: SkinColors.instance.accent.withValues(alpha: 0.19),
+                        blurRadius: 14,
+                      )
+                    ]
                   : null,
             ),
             child: Row(children: [
               Icon(
-                _playing == s.ref ? Icons.graphic_eq : Icons.play_arrow,
-                size: 18,
+                playing ? Icons.graphic_eq : Icons.play_arrow_rounded,
+                size: 20,
                 color: chosen ? SkinColors.instance.accent : DuetColors.dim,
               ),
               const SizedBox(width: 13),
@@ -152,8 +186,13 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                       color: chosen ? DuetColors.text : DuetColors.muted),
                 ),
               ),
+              // A little equalizer on every row: dancing while its sound
+              // plays, a still silhouette otherwise.
+              WaveformBars(playing: playing, count: 5, height: 14),
+              const SizedBox(width: 10),
               if (chosen)
-                Icon(Icons.favorite_rounded, size: 17, color: SkinColors.instance.accent),
+                Icon(Icons.favorite_rounded,
+                    size: 17, color: SkinColors.instance.accent),
             ]),
           ),
         ),

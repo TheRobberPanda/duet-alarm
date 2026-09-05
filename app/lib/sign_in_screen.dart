@@ -64,13 +64,20 @@ class _SignInScreenState extends State<SignInScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              const Center(child: PairRing(size: 96)),
+              const Center(
+                child: HaloGlow(size: 300, child: PairRing(size: 104)),
+              ),
               const SizedBox(height: 28),
               const Row(
                 children: [
                   Expanded(
                     child: Text('An alarm you share.',
-                        style: TextStyle(fontSize: 30, height: 1.1, color: DuetColors.text)),
+                        style: TextStyle(
+                            fontSize: 30,
+                            height: 1.1,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: -0.3,
+                            color: DuetColors.text)),
                   ),
                   HeartAccent(size: 22),
                 ],
@@ -105,12 +112,19 @@ class _SignInScreenState extends State<SignInScreen> {
                   // match it is a silent breakage waiting to happen -- exactly
                   // what bit us: the code arrived longer than the field allowed
                   // and could not be typed at all. Let the server decide what is
-                  // valid; the field just has to not get in the way.
+                  // valid; the field just has to not get in the way. (Which is
+                  // also why the canvas's segmented code cells are not used
+                  // here: they assume a known length. pair_screen can afford
+                  // them -- the invite code IS six -- this field cannot.)
                   maxLength: 12,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onSubmitted: (_) => _verify(),
-                  style: const TextStyle(
-                      color: DuetColors.text, fontSize: 26, letterSpacing: 6),
+                  style: TextStyle(
+                      color: DuetColors.text,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 8,
+                      fontFeatures: const [FontFeature.tabularFigures()]),
                   textAlign: TextAlign.center,
                   decoration: _fieldDecoration('', 'Code from your email')
                       .copyWith(counterText: ''),

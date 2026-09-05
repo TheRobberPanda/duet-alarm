@@ -180,6 +180,7 @@ class _PairGateState extends State<PairGate> {
               : HomeScreen(
                   key: const ValueKey('home'),
                   partnerName: paired ? pair.partner!.shortName : null,
+                  partnerTimezone: paired ? pair.partner!.timezone : null,
                   onInvite: paired
                       ? null
                       : () => setState(() => _skippedPairing = false),

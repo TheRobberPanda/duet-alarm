@@ -208,6 +208,13 @@ class AlarmRepository {
       // user just asked for.
       if (a.id.startsWith('snooze:')) continue;
 
+      // Test alarms belong to the health screen's Test button, not to a
+      // definition either. Before this exemption, arming a test and then
+      // refreshing (which the test button itself does) disarmed the test
+      // within the same second -- the button armed an alarm it then killed,
+      // and no test ever rang.
+      if (a.id.startsWith('test-')) continue;
+
       // Anything beyond our window was armed by the native side when a
       // repeating alarm fired, so that a Monday-only alarm does not need the
       // app to run before it can ring again. We cannot see those in `desired`

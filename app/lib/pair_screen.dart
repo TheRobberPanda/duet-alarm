@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'pair_repository.dart';
+import 'qr_scan_screen.dart';
 import 'theme.dart';
 
 /// Pair setup.
@@ -32,6 +34,10 @@ class _PairScreenState extends State<PairScreen> {
   String? _myCode;
   bool _busy = false;
   bool _entering = false;
+
+  // The invite card shows either the six characters or a QR encoding them --
+  // same code, two ways to carry it across a table.
+  bool _showQr = false;
   String? _error;
 
   @override
@@ -97,7 +103,12 @@ class _PairScreenState extends State<PairScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text('Invite your person.',
-                  style: TextStyle(fontSize: 30, height: 1.1, color: DuetColors.text)),
+                  style: TextStyle(
+                      fontSize: 30,
+                      height: 1.1,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: -0.3,
+                      color: DuetColors.text)),
               const SizedBox(height: 10),
               const Text(
                 'Send them this code. Once they enter it, your alarms are shared.',
@@ -155,57 +166,42 @@ class _PairScreenState extends State<PairScreen> {
         ),
         child: Column(
           children: [
-            const SectionLabel('Your invite code'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SectionLabel('Your invite code'),
+                if (code != null) _codeQrToggle(),
+              ],
+            ),
             const SizedBox(height: 18),
             if (code == null)
-              SizedBox(
-                height: 60,
-                child: Center(
-                    child: CircularProgressIndicator(color: SkinColors.instance.accent)),
-              )
-            else
-              // Expanded, not fixed-width: six 44px cells plus margins overflow a
-              // 384dp screen by 12px, and the invite code is the one screen
-              // that must never look broken -- it is the whole growth engine.
+              // Skeleton, not a spinner: the shape of what is arriving.
               Row(
                 children: [
-                  for (final ch in code.split(''))
+                  for (var i = 0; i < 6; i++)
                     Expanded(
                       child: Container(
-                      height: 58,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: DuetColors.bg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: DuetColors.line),
+                        height: 58,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        child: const Skeleton(radius: 12),
                       ),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(ch,
-                            style: const TextStyle(
-                                fontSize: 26,
-                                color: DuetColors.text,
-                                fontFeatures: [FontFeature.tabularFigures()])),
-                      ),
-                    ),
                     ),
                 ],
-              ),
+              )
+            else if (_showQr) ..._qrBlock(code) else ..._cells(code),
             const SizedBox(height: 14),
             const Text('Expires in 24 hours',
                 style: TextStyle(fontSize: 13, color: DuetColors.dim)),
             const SizedBox(height: 18),
             DuetButton(
               'Copy code',
+              icon: Icons.copy_rounded,
               filled: true,
               onTap: code == null
                   ? null
                   : () {
                       Clipboard.setData(ClipboardData(text: code));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Code copied')),
-                      );
+                      showDuetSnackBar(context, 'Code copied', icon: Icons.copy_rounded);
                     },
             ),
           ],
@@ -235,6 +231,113 @@ class _PairScreenState extends State<PairScreen> {
     ];
   }
 
+  /// Six characters, one per cell, entering with a tiny stagger -- the code
+  /// assembles itself in front of you. Expanded, not fixed-width: six 44px
+  /// cells plus margins overflow a 384dp screen by 12px, and the invite code
+  /// is the one screen that must never look broken -- it is the whole growth
+  /// engine.
+  List<Widget> _cells(String code) => [
+        Row(
+          children: [
+            for (final (i, ch) in code.split('').indexed)
+              Expanded(
+                child: FadeSlideIn(
+                  key: ValueKey('cell-$i-$ch'),
+                  delay: Duration(milliseconds: 45 * i),
+                  child: Container(
+                    height: 58,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: DuetColors.bg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: DuetColors.line),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(ch,
+                          style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w500,
+                              color: DuetColors.text,
+                              fontFeatures: [FontFeature.tabularFigures()])),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ];
+
+  /// The same code as a QR, on a light island -- cameras need contrast, so
+  /// the plum field gets exactly one bright rectangle.
+  List<Widget> _qrBlock(String code) => [
+        Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 240),
+            child: Container(
+              key: ValueKey(code),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: DuetColors.text,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: QrImageView(
+                data: code,
+                size: 172,
+                backgroundColor: DuetColors.text,
+                eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square, color: DuetColors.amberInk),
+                dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: DuetColors.amberInk),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Center(
+          child: Text('Let their camera read this',
+              style: TextStyle(fontSize: 13, color: DuetColors.dim)),
+        ),
+      ];
+
+  Widget _codeQrToggle() => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _togglePill('Code', Icons.pin_rounded, !_showQr),
+          const SizedBox(width: 6),
+          _togglePill('QR', Icons.qr_code_2_rounded, _showQr),
+        ],
+      );
+
+  Widget _togglePill(String label, IconData icon, bool on) => GestureDetector(
+        onTap: () => setState(() => _showQr = label == 'QR'),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            gradient: on ? SkinColors.instance.wash : null,
+            color: on ? null : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 13, color: on ? DuetColors.amberInk : DuetColors.dim),
+              const SizedBox(width: 5),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: on ? DuetColors.amberInk : DuetColors.dim)),
+            ],
+          ),
+        ),
+      );
+
   List<Widget> _redeemSide() => [
         TextField(
           controller: _codeInput,
@@ -247,8 +350,12 @@ class _PairScreenState extends State<PairScreen> {
             TextInputFormatter.withFunction((_, n) =>
                 n.copyWith(text: n.text.toUpperCase())),
           ],
-          style: const TextStyle(
-              fontSize: 30, letterSpacing: 10, color: DuetColors.text),
+          style: TextStyle(
+              fontSize: 30,
+              letterSpacing: 10,
+              fontWeight: FontWeight.w400,
+              color: DuetColors.text,
+              fontFeatures: const [FontFeature.tabularFigures()]),
           decoration: InputDecoration(
             counterText: '',
             hintText: 'ABC123',
@@ -268,5 +375,24 @@ class _PairScreenState extends State<PairScreen> {
         ),
         const SizedBox(height: 12),
         DuetButton('Join them', filled: true, busy: _busy, onTap: _redeem),
+        const SizedBox(height: 10),
+        DuetButton(
+          'Scan their QR',
+          icon: Icons.qr_code_scanner_rounded,
+          busy: _busy,
+          onTap: _scan,
+        ),
       ];
+
+  /// Same table, no typing: read the code off their screen with the camera.
+  /// A scanned code goes straight into redemption -- if the camera read a
+  /// stale code the redeem error surfaces in plain language.
+  Future<void> _scan() async {
+    final code = await Navigator.of(context).push<String>(
+      DuetPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (code == null || !mounted) return;
+    _codeInput.text = code.toUpperCase();
+    await _redeem();
+  }
 }

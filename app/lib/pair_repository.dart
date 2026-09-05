@@ -118,6 +118,92 @@ class PairRepository {
     };
   }
 
+  /// The most recent ring the two of you have BOTH been up for, if it is
+  /// fresh enough to still be "this morning" in spirit. Everything the wake
+  /// receipt shows is derived from `ring_participants` (who dismissed when,
+  /// how many snoozes each) and the last month of sessions (streak) -- the
+  /// `wake_receipts` table itself has no writer yet, so reading it would
+  /// always come back empty.
+  ///
+  /// "Who was first" approximated by earliest `updated_at` among dismissed
+  /// participants: that column also moves on snoozes, but a final dismiss is
+  /// always that participant's last touch, so the earliest final touch is
+  /// genuinely the first one up.
+  Future<WakeReceiptData?> latestWake() async {
+    final me = currentUser?.id;
+    if (me == null) return null;
+    final PairState pair;
+    try {
+      final p = await currentPair();
+      if (p == null || p.partner == null) return null;
+      pair = p;
+    } catch (_) {
+      return null; // No pair == no shared rings; never a reason to error.
+    }
+    final partnerId = pair.partner!.id;
+
+    final List<dynamic> sessions;
+    try {
+      sessions = await _db
+          .from('ring_sessions')
+          .select('id, fired_at, ring_participants(user_id, state, snooze_count, updated_at)')
+          .eq('pair_id', pair.pairId)
+          .order('fired_at', ascending: false)
+          .limit(30);
+    } catch (_) {
+      return null; // Receipt is a bonus; a flaky embed must not break home.
+    }
+    if (sessions.isEmpty) return null;
+
+    final latest = sessions.first as Map<String, dynamic>;
+    final firedAt = DateTime.parse(latest['fired_at'] as String);
+
+    // A receipt from a week ago is not a receipt. 20h covers an alarm any
+    // time yesterday evening through this morning.
+    if (DateTime.now().difference(firedAt) > const Duration(hours: 20)) {
+      return null;
+    }
+
+    final parts = (latest['ring_participants'] as List).cast<Map<String, dynamic>>();
+    final mine = parts.where((p) => p['user_id'] == me).toList();
+    final theirs = parts.where((p) => p['user_id'] == partnerId).toList();
+    if (mine.isEmpty || theirs.isEmpty) return null;
+    if (mine.first['state'] != 'dismissed' || theirs.first['state'] != 'dismissed') {
+      return null; // Still ringing, snoozing, or one of you slept through.
+    }
+
+    DateTime actedOn(Map<String, dynamic> p) => DateTime.parse(p['updated_at'] as String);
+    final dismissed = parts.where((p) => p['state'] == 'dismissed').toList();
+    final firstUpId = dismissed
+        .reduce((a, b) => actedOn(a).isBefore(actedOn(b)) ? a : b)['user_id'] as String;
+
+    // Streak: consecutive local days, counting back from the newest session,
+    // where both of you ended up dismissed. Any gap or incomplete day ends
+    // the run -- a streak that forgives would stop being a score.
+    var streak = 0;
+    DateTime? prev;
+    for (final s in sessions) {
+      final ps = (s['ring_participants'] as List).cast<Map<String, dynamic>>();
+      if (ps.length < 2 || ps.any((p) => p['state'] != 'dismissed')) break;
+      final day = DateTime.parse(s['fired_at'] as String).toLocal();
+      final d = DateTime(day.year, day.month, day.day);
+      if (prev != null && prev.difference(d) != const Duration(days: 1)) break;
+      prev = d;
+      streak++;
+    }
+
+    return WakeReceiptData(
+      sessionId: latest['id'] as String,
+      firedAt: firedAt,
+      iWasFirst: firstUpId == me,
+      mySnoozes: (mine.first['snooze_count'] as int?) ?? 0,
+      partnerSnoozes: (theirs.first['snooze_count'] as int?) ?? 0,
+      mySeconds: actedOn(mine.first).difference(firedAt).inSeconds.clamp(0, 24 * 3600),
+      partnerSeconds: actedOn(theirs.first).difference(firedAt).inSeconds.clamp(0, 24 * 3600),
+      streakDays: streak,
+    );
+  }
+
   // ── Pairing ──────────────────────────────────────────────────────────────
 
   /// Creates the caller's pair if they have none and returns a fresh code.
@@ -220,4 +306,31 @@ class PairState {
 
   bool get isComplete => partner != null;
   bool get isPaid => plan == 'full';
+}
+
+/// What the wake receipt screen shows, all derived server-side-readable data.
+/// See [PairRepository.latestWake] for where each field comes from and why
+/// "who was first" is an approximation.
+class WakeReceiptData {
+  WakeReceiptData({
+    required this.sessionId,
+    required this.firedAt,
+    required this.iWasFirst,
+    required this.mySnoozes,
+    required this.partnerSnoozes,
+    required this.mySeconds,
+    required this.partnerSeconds,
+    required this.streakDays,
+  });
+
+  final String sessionId;
+  final DateTime firedAt;
+
+  /// True if your final dismiss landed before theirs.
+  final bool iWasFirst;
+  final int mySnoozes;
+  final int partnerSnoozes;
+  final int mySeconds;
+  final int partnerSeconds;
+  final int streakDays;
 }
