@@ -219,19 +219,84 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 12),
               ],
 
-              if (widget.partnerName != null) ...[
+              if (_repo.sync != null && !_repo.lastSyncOk) ...[
                 DuetCard(
+                  border: SkinColors.instance.accent.withValues(alpha: 0.5),
                   child: Row(children: [
-                    const PairRing(size: 40, strokeWidth: 2.5),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text('You and ${widget.partnerName}',
-                          style: const TextStyle(
-                              fontSize: 15, color: DuetColors.text)),
+                    Icon(Icons.cloud_off_outlined,
+                        color: SkinColors.instance.accent, size: 20),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Not synced. Your alarms still ring on this phone, but '
+                        'changes have not reached your partner yet.',
+                        style: TextStyle(
+                            color: DuetColors.text, fontSize: 13.5, height: 1.4),
+                      ),
                     ),
                   ]),
                 ),
+                const SizedBox(height: 12),
+              ],
+
+              if (next != null) ...[
+                FadeSlideIn(
+                  key: ValueKey('next-${next.alarm.id}'),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () => _edit(next.alarm),
+                      child: _dial(next.alarm, next.at),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              if (widget.partnerName != null) ...[
+                // A line, not a card: the dial above already shows the two of
+                // you in your own colors. This only adds the name.
+                Center(
+                  child: Text(
+                    'You and ${widget.partnerName}',
+                    style: const TextStyle(
+                        fontSize: 13.5, color: DuetColors.dim, letterSpacing: 0.2),
+                  ),
+                ),
+                const SizedBox(height: 22),
+              ],
+
+              if (next == null && alarms.isNotEmpty) ...[
+                DuetCard(
+                  child: Text(
+                    // Two different situations, and saying the wrong one is a
+                    // lie about whether anything will ring: every switch off,
+                    // versus switches on but nothing left to fire (a one-shot
+                    // whose day has passed).
+                    alarms.any((a) => a.enabled)
+                        ? 'Nothing coming up. The alarms that are on have already passed.'
+                        : 'Every alarm is switched off.',
+                    style: const TextStyle(color: DuetColors.dim, fontSize: 14.5, height: 1.4),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              if (alarms.isEmpty)
+                _emptyState()
+              else if (alarms.length > 1) ...[
+                const SizedBox(height: 26),
+                SectionLabel('All alarms (${alarms.length})'),
                 const SizedBox(height: 10),
+                ...alarms.asMap().entries.map((e) => FadeSlideIn(
+                      key: ValueKey(e.value.id),
+                      delay: Duration(milliseconds: 45 * e.key),
+                      child: _alarmRow(e.value),
+                    )),
+              ],
+
+              if (widget.partnerName != null) ...[
+                const SizedBox(height: 18),
                 Builder(builder: (context) {
                   final tips = _tips();
                   final tip = tips[_tipIndex % tips.length];
@@ -256,60 +321,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ]),
                   );
                 }),
-                const SizedBox(height: 12),
               ],
 
-              if (_repo.sync != null && !_repo.lastSyncOk) ...[
-                DuetCard(
-                  border: SkinColors.instance.accent.withValues(alpha: 0.5),
-                  child: Row(children: [
-                    Icon(Icons.cloud_off_outlined,
-                        color: SkinColors.instance.accent, size: 20),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Not synced. Your alarms still ring on this phone, but '
-                        'changes have not reached your partner yet.',
-                        style: TextStyle(
-                            color: DuetColors.text, fontSize: 13.5, height: 1.4),
-                      ),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              if (next != null)
-                FadeSlideIn(
-                  key: ValueKey('next-${next.alarm.id}'),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(22),
-                      onTap: () => _edit(next.alarm),
-                      child: _dial(next.alarm, next.at),
-                    ),
-                  ),
-                ),
-              if (next == null && alarms.isNotEmpty) ...[
-                const DuetCard(
-                  child: Text('Every alarm is switched off.',
-                      style: TextStyle(color: DuetColors.dim, fontSize: 14.5)),
-                ),
-              ],
-
-              if (alarms.isEmpty)
-                _emptyState()
-              else if (alarms.length > 1) ...[
-                const SizedBox(height: 26),
-                SectionLabel('All alarms (${alarms.length})'),
-                const SizedBox(height: 10),
-                ...alarms.asMap().entries.map((e) => FadeSlideIn(
-                      key: ValueKey(e.value.id),
-                      delay: Duration(milliseconds: 45 * e.key),
-                      child: _alarmRow(e.value),
-                    )),
-              ],
             ],
           ),
         ),
