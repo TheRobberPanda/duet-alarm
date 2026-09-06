@@ -31,8 +31,11 @@ class SyncReceiver : BroadcastReceiver() {
         // Held across the async pull: onReceive's own window closes as soon as
         // it returns, and the fetch outlives it.
         val pending = goAsync()
-        Log.i(TAG, "resync tick")
+        // Rescheduled BEFORE the pull, so a pull that fails cannot end the
+        // heartbeat -- a phone that stops resyncing stops learning about its
+        // partner's alarms, and would never recover on its own.
         schedule(context)
+        Log.i(TAG, "resync tick")
         AlarmPull.pull(context) { pending.finish() }
     }
 
@@ -52,10 +55,21 @@ class SyncReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        /**
+         * Hourly instead of every ten minutes when there is nobody signed in.
+         * A signed-out phone has nothing to fetch, and waking it up 144 times a
+         * day to find that out is a battery cost with no upside. Signing in
+         * pushes credentials down and MainActivity reschedules, so the fast
+         * cadence comes back immediately.
+         */
+        private const val IDLE_INTERVAL_MS = 60L * 60L * 1000L
+
         /** Idempotent: replaces any tick already pending. */
         fun schedule(ctx: Context) {
             val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val at = System.currentTimeMillis() + INTERVAL_MS
+            val interval =
+                if (AuthStore.accessToken(ctx) == null) IDLE_INTERVAL_MS else INTERVAL_MS
+            val at = System.currentTimeMillis() + interval
             try {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pendingIntent(ctx))
             } catch (t: Throwable) {

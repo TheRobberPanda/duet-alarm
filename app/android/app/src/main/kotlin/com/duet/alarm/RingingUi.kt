@@ -169,7 +169,19 @@ class HoldButton(
         contentDescription = label
     }
 
-    @Suppress("ClickableViewAccessibility")
+    /**
+     * The hold cannot be performed with TalkBack -- an explore-by-touch user
+     * has no way to press and keep pressing -- so the accessibility activation
+     * fires it directly. That is not a hole in the safeguard: TalkBack's
+     * activation is already a deliberate double-tap on a focused element, not
+     * something a sleeping hand does.
+     */
+    override fun performClick(): Boolean {
+        super.performClick()
+        onComplete()
+        return true
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
