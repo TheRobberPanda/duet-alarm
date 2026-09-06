@@ -229,7 +229,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // A whisper of help in between the numbers, so the line teaches as well
     // as reports -- one tip, last, rotated by the ticker.
     if (_partnerName != null) {
-      stats.add('Tip: hold Dismiss to end the alarm for both of you at once.');
+      stats.add('Tip: hold the "for both" button to end the alarm on both '
+          'phones at once.');
     } else {
       stats.add('Tip: tap the big time to set it on a clock dial.');
     }

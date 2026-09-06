@@ -1,7 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'alarm_engine.dart';
 import 'theme.dart';
+
+/// Turns whatever Spotify put on the clipboard into a `spotify:` sound ref.
+///
+/// Accepts the share link (`https://open.spotify.com/track/ID?si=...`), the
+/// URI (`spotify:track:ID`), and the country-prefixed link Spotify sometimes
+/// produces (`.../intl-es/track/ID`). Returns null for anything else, so the
+/// field can say so instead of storing a ref that will never play.
+///
+/// Deliberately a pure function with no network: identifying a track needs no
+/// account, which is the entire reason Duet asks for a pasted link instead of
+/// running an OAuth flow.
+String? spotifyRefFromInput(String raw) {
+  final input = raw.trim();
+  if (input.isEmpty) return null;
+
+  final uri = RegExp(r'^spotify:(track|playlist|album|episode|show):([A-Za-z0-9]+)')
+      .firstMatch(input);
+  if (uri != null) return 'spotify:${uri.group(1)}:${uri.group(2)}';
+
+  final link = RegExp(
+    r'open\.spotify\.com/(?:intl-[a-z]{2}/)?(track|playlist|album|episode|show)/([A-Za-z0-9]+)',
+  ).firstMatch(input);
+  if (link != null) return 'spotify:${link.group(1)}:${link.group(2)}';
+
+  return null;
+}
+
+/// 'Spotify track' / 'Spotify playlist' -- what a stored ref should be called
+/// in a list of tones.
+String spotifyRefTitle(String ref) {
+  final kind = ref.split(':').length > 1 ? ref.split(':')[1] : 'track';
+  return 'Spotify ${kind == 'show' ? 'podcast' : kind}';
+}
 
 /// Pick from the sounds already on this phone.
 ///
@@ -24,6 +58,11 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
   String? _playing;
   bool _loading = true;
 
+  final _spotifyInput = TextEditingController();
+  String? _spotifyError;
+
+  bool get _spotifyChosen => _selected.startsWith('spotify:');
+
   @override
   void initState() {
     super.initState();
@@ -33,8 +72,32 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
 
   @override
   void dispose() {
+    _spotifyInput.dispose();
     AlarmEngine.stopPreview();
     super.dispose();
+  }
+
+  Future<void> _pasteSpotify() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) return;
+    _spotifyInput.text = data?.text?.trim() ?? '';
+    _applySpotify();
+  }
+
+  void _applySpotify() {
+    final ref = spotifyRefFromInput(_spotifyInput.text);
+    setState(() {
+      if (ref == null) {
+        _spotifyError = _spotifyInput.text.trim().isEmpty
+            ? null
+            : "That does not look like a Spotify link.";
+      } else {
+        _spotifyError = null;
+        _selected = ref;
+        _playing = null;
+      }
+    });
+    if (ref != null) AlarmEngine.stopPreview();
   }
 
   Future<void> _load() async {
@@ -97,6 +160,8 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                 const SizedBox(height: 18),
                 ..._sounds.map(_row),
                 const SizedBox(height: 26),
+                _spotifyCard(),
+                const SizedBox(height: 14),
                 DuetCard(
                   child: Row(children: [
                     Container(
@@ -134,6 +199,83 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  /// Wake up to a song -- with the tone underneath it, always.
+  ///
+  /// No sign-in: pasting a link identifies a track without an account, so the
+  /// only thing Duet ever needs is the URI. The copy is blunt about the
+  /// fallback because the failure modes are real and invisible (no Premium, no
+  /// signal, signed out on the phone) and someone choosing this should know
+  /// what they will actually hear on a bad morning.
+  Widget _spotifyCard() {
+    final accent = SkinColors.instance.accent;
+    return DuetCard(
+      border: _spotifyChosen ? accent.withValues(alpha: 0.5) : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accent.withValues(alpha: 0.14),
+                border: Border.all(color: accent.withValues(alpha: 0.35)),
+              ),
+              child: const Icon(Icons.library_music_outlined,
+                  size: 18, color: DuetColors.muted),
+            ),
+            const SizedBox(width: 13),
+            const Expanded(
+              child: Text('Wake up to a song',
+                  style: TextStyle(
+                      color: DuetColors.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500)),
+            ),
+            if (_spotifyChosen)
+              Icon(Icons.favorite_rounded, size: 17, color: accent),
+          ]),
+          const SizedBox(height: 10),
+          const Text(
+            'Paste a Spotify link. The alarm tone still starts first and only '
+            'goes quiet once Spotify is actually playing, so a morning with no '
+            'signal, no Premium or Spotify signed out still wakes you.',
+            style: TextStyle(fontSize: 12.5, color: DuetColors.dim, height: 1.45),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _spotifyInput,
+                onChanged: (_) => _applySpotify(),
+                style: const TextStyle(fontSize: 14, color: DuetColors.text),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'open.spotify.com/track/...',
+                  hintStyle: const TextStyle(fontSize: 13.5, color: DuetColors.dim),
+                  errorText: _spotifyError,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Paste',
+              onPressed: _pasteSpotify,
+              icon: Icon(Icons.content_paste_rounded, size: 20, color: accent),
+            ),
+          ]),
+          if (_spotifyChosen) ...[
+            const SizedBox(height: 8),
+            Text('Chosen: ${spotifyRefTitle(_selected)}',
+                style: TextStyle(fontSize: 12.5, color: accent)),
+          ],
+        ],
+      ),
     );
   }
 

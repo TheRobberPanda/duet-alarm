@@ -20,7 +20,19 @@ object SoundCatalog {
     private const val TAG = "DuetSounds"
     private var preview: MediaPlayer? = null
 
-    /** `default` resolves to the system alarm tone, falling back to the ringtone. */
+    /** A Spotify track or playlist, e.g. `spotify:track:4cOdK2wGLETKBW3PvgPWqT`. */
+    const val SPOTIFY_PREFIX = "spotify:"
+
+    /**
+     * `default` resolves to the system alarm tone, falling back to the ringtone.
+     *
+     * A `spotify:` ref resolves here TOO, and deliberately: this returns the
+     * sound that will actually come out of the phone, and for a Spotify alarm
+     * that is the fallback tone until Spotify is confirmed to be playing (see
+     * AlarmService.startAudio). Resolving it to null instead would mean a
+     * silent morning every time Spotify was uninstalled, logged out, no longer
+     * Premium, or simply offline.
+     */
     fun resolve(ctx: Context, soundRef: String): Uri? = when {
         soundRef.startsWith("device:") ->
             runCatching { Uri.parse(soundRef.removePrefix("device:")) }.getOrNull()

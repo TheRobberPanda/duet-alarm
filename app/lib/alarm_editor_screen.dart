@@ -88,6 +88,13 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
       setState(() => _soundTitle = 'Default alarm');
       return;
     }
+    // A Spotify ref is not in the device catalogue and never will be, so
+    // looking for it there would fall through to "Custom sound" and hide what
+    // this alarm will actually try to play.
+    if (_soundRef.startsWith('spotify:')) {
+      setState(() => _soundTitle = spotifyRefTitle(_soundRef));
+      return;
+    }
     final sounds = await AlarmEngine.listSounds();
     for (final s in sounds) {
       if (s.ref == _soundRef && mounted) {
@@ -413,11 +420,11 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Transform.rotate(
-                        angle: math.pi / 2,
-                        child: Icon(Icons.subdirectory_arrow_left_rounded,
-                            size: 20, color: SkinColors.instance.accent),
-                      ),
+                      // Straight down, at the number directly below it. A
+                      // turning arrow reads as "over there" and this one has
+                      // to mean "that, right there".
+                      Icon(Icons.arrow_downward_rounded,
+                          size: 19, color: SkinColors.instance.accent),
                     ],
                   ),
                 ),

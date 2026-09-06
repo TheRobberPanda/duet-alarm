@@ -27,6 +27,22 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // A Spotify Client ID is public by design (like the Supabase
+        // publishable key); it is passed in rather than committed only so a
+        // fork does not silently ship someone else's quota. Absent, it is ""
+        // and the Spotify feature is simply off.
+        buildConfigField(
+            "String",
+            "SPOTIFY_CLIENT_ID",
+            "\"${project.findProperty("spotify.clientId") ?: ""}\""
+        )
+    }
+
+    // Enabled so SpotifyConfig can read the Client ID that was passed in at
+    // build time rather than committed. Off by default in AGP 8.
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -35,6 +51,26 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// Spotify's App Remote SDK is not on Maven: it is an .aar downloaded from the
+// Spotify developer dashboard after accepting their terms, which this repo
+// cannot do for you. So it is optional. Drop
+// `app/libs/spotify-app-remote-release.aar` in and the real implementation is
+// compiled; without it the stub is, and Spotify alarms fall back to their
+// tone. Two source sets, one API -- see SpotifyRemote.kt in each.
+val spotifyAar = file("libs/spotify-app-remote-release.aar")
+
+android.sourceSets.getByName("main").kotlin.srcDir(
+    if (spotifyAar.exists()) "src/spotify/kotlin" else "src/nospotify/kotlin"
+)
+
+dependencies {
+    if (spotifyAar.exists()) {
+        implementation(files(spotifyAar))
+        // App Remote needs these at runtime; they ARE on Maven.
+        implementation("com.google.code.gson:gson:2.10.1")
     }
 }
 

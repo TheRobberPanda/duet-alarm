@@ -295,6 +295,30 @@ class AlarmService : Service() {
         } catch (t: Throwable) {
             Log.e(TAG, "audio failed", t)
         }
+
+        // The Spotify upgrade, applied to an alarm that is ALREADY ringing.
+        //
+        // Order matters and is the whole safety argument: the fallback tone
+        // above is playing before this is attempted, and it is only silenced
+        // once Spotify reports it is genuinely producing sound. Spotify needs
+        // its app installed, a logged-in account, live Premium and a network,
+        // any of which can be gone at 06:00 without warning -- so it is never
+        // allowed to be the reason a phone makes noise (ADR-001). Every
+        // failure path leaves the tone exactly where it is.
+        if (soundRef.startsWith(SoundCatalog.SPOTIFY_PREFIX)) {
+            SpotifyRemote.play(this, soundRef) { playing ->
+                if (!playing) return@play
+                // Spotify has the room now; two alarms at once is worse than
+                // either. Posted to the main thread because the callback
+                // arrives on the SDK's.
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    runCatching { player?.stop() }
+                    player?.release()
+                    player = null
+                    Log.i(TAG, "Spotify took over from the fallback tone")
+                }
+            }
+        }
     }
 
     private fun startVibration() {
@@ -314,6 +338,9 @@ class AlarmService : Service() {
     private fun stopRinging() {
         // The socket lives exactly as long as the ring does -- see startLanListener().
         LanSync.stopListening()
+        // Harmless when Spotify was never involved, and essential when it was:
+        // the alarm ending must stop the music too.
+        SpotifyRemote.stop()
         try { player?.stop() } catch (_: Throwable) {}
         player?.release(); player = null
         vibrator?.cancel(); vibrator = null
