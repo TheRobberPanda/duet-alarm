@@ -88,16 +88,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _load();
   }
 
+  // Guards frantic theme-tapping. Every tap bumps the sequence; a queued
+  // write whose sequence has been superseded never fires, writes are
+  // serialized so the server sees taps in click order, and a slow reload can
+  // never clobber a newer pick with stale server truth. Without this, rapid
+  // clicking left the app stuck on an earlier theme.
+  int _accentSeq = 0;
+  Future<void> _accentWrite = Future.value();
+
   Future<void> _setAccent(String skinId) async {
+    final seq = ++_accentSeq;
     // Instant locally -- SkinColors is what every PairRing actually reads,
     // and this screen shouldn't feel like it's waiting on the network to
     // show you your own choice.
     SkinColors.instance.setSkins(mine: skinId, partner: null);
-    // Keep the native ringing screen in step with the choice just made.
-    AlarmEngine.setSkinColors(
-      SkinColors.instance.mine.toARGB32(),
-      SkinColors.instance.partner.toARGB32(),
-    );
     setState(() => _profile = _profile == null
         ? null
         : Profile(
@@ -107,8 +111,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             allowPartnerDismiss: _profile!.allowPartnerDismiss,
             accent: skinId,
           ));
-    await _repo.updateAccent(skinId);
-    await _load();
+
+    // Everything below is bookkeeping, not feedback. A theme switch repaints
+    // the entire app in this frame -- platform channels and network round
+    // trips used to share that frame and the picker visibly lagged behind
+    // the tap. Next frame: native colors, cosmetics, server, reconciliation.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AlarmEngine.setSkinColors(
+        SkinColors.instance.mine.toARGB32(),
+        SkinColors.instance.partner.toARGB32(),
+      );
+      pushCosmetics(partnerName: _pair?.partner?.shortName);
+      _accentWrite = _accentWrite.then((_) async {
+        if (seq != _accentSeq || !mounted) return; // superseded while queued
+        await _repo.updateAccent(skinId);
+        if (seq == _accentSeq && mounted) await _load();
+      }).catchError((_) {
+        // Server truth lags; the app already looks right.
+      });
+    });
   }
 
   Future<void> _leavePair() async {
@@ -395,7 +416,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     opacity: 1,
                     duration: const Duration(milliseconds: 180),
                     child: Container(
-                      color: DuetColors.bgDeep.withValues(alpha: 0.45),
+                      color: SkinColors.instance.pal.bgDeep.withValues(alpha: 0.45),
                       alignment: Alignment.center,
                       child: const CircularProgressIndicator(color: DuetColors.amber),
                     ),
@@ -459,7 +480,7 @@ class _SkinPreviewPainter extends CustomPainter {
     final track = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
-      ..color = DuetColors.line;
+      ..color = SkinColors.instance.pal.line;
     canvas.drawCircle(c, rect.width / 2, track);
 
     final minePaint = Paint()

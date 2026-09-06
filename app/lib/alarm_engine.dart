@@ -56,6 +56,16 @@ class AlarmEngine {
   static Future<void> setSkinColors(int mine, int partner) =>
       _channel.invokeMethod('setSkinColors', {'mine': mine, 'partner': partner});
 
+  /// The theme's background and the partner's display name -- the ringing
+  /// screen dresses in your theme's world and can say who woke up first when
+  /// a shared ring ends (ADR-016). Pushed alongside [setSkinColors]; the
+  /// name is null when solo or unpaired.
+  static Future<void> setCosmetics({String? partnerName, required int bgColor}) =>
+      _channel.invokeMethod('setCosmetics', {
+        'partnerName': partnerName,
+        'bgColor': bgColor,
+      });
+
   /// What the native LAN fast path (LanSync.kt) needs to sign its datagrams,
   /// route them to the right pair, and decide whether to honour an incoming
   /// "dismiss for both". Nulls clear it -- which is what leaving a pair or

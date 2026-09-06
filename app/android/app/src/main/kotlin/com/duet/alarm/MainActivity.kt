@@ -118,6 +118,18 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
 
+                    // The theme's background and the partner's display name:
+                    // the ringing screen dresses in your theme's world and,
+                    // when a ring ends, can say who woke up first.
+                    "setCosmetics" -> {
+                        AuthStore.setCosmetics(
+                            this,
+                            call.argument<String>("partnerName"),
+                            call.argument<Number>("bgColor")?.toInt() ?: 0
+                        )
+                        result.success(null)
+                    }
+
                     // The pair context LanSync signs and authorises with. Nulls
                     // clear it, which is what leaving a pair or signing out does.
                     "setPairContext" -> {

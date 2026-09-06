@@ -296,3 +296,53 @@ dependency; if it ever breaks a build, the documented fallback is QR display +
 manual entry, which is the pre-2026-09 state and loses nothing but convenience.
 The camera flow adds a permission prompt only on the scan path, not at install
 or on the alarm path (ADR-001 is untouched: pairing was already network-bound).
+
+---
+
+### ADR-016 — Themes are whole worlds: palette, mascot, and native cosmetics
+
+**Status:** Accepted
+
+**Context.** Themes changed two accent colors; the app around them stayed plum.
+The home dial had no personality, and after dismissing a shared ring the screen
+simply vanished -- the one multiplayer moment with no multiplayer feeling in it.
+
+**Decision.** Each theme now carries a full palette (background gradient,
+surface tones, hairline) and a mascot glyph. Picking a theme re-dresses the
+entire app -- backgrounds included -- and the home dial gains the mascot
+standing faintly behind the ring, plus an interior half-fill (right quarter
+yours, left quarter theirs, only when each of you has the alarm on). The
+native ringing screen receives the theme's background and the partner's
+display name via `AuthStore` (same push path as skin colors), and on DISMISS
+-- never snooze -- shows a ~1.5s farewell: check-pop, floating hearts, and,
+only when the partner poll supports it, "You woke up before {name}" /
+"{name} beat you to it". Uncertain state says nothing rather than a wrong
+name.
+
+**Consequences.** Every `DuetColors.surface/bg` call site became
+skin-palette-driven, so adding a theme = adding one `SkinPalette` entry.
+Backgrounds are always YOUR theme; partner skins stay on their half of the
+ring. The ringing screen's farewell depends on polled partner state (up to
+~4s stale) -- hence the "only when certain" copy rule. Home nags once for a
+display name (persistent card until saved), because an unnamed partner ships
+as "Partner" forever.
+
+---
+
+### ADR-017 — Daily installs are arm64-only debug slices
+
+**Status:** Accepted
+
+**Context.** The universal debug APK shipped four ABIs at ~180 MB and grew
+with every dependency; iteration on the one test device paid for all of them.
+
+**Decision.** `tool/install.sh` builds `--split-per-abi` and installs the
+arm64-v8a slice only (~1/3 the size). Still DEBUG: release builds carry
+versionCode 2001+, and a later debug build is rejected as a downgrade whose
+only fix is an uninstall that wipes the Supabase session (docs/14 gotcha 3).
+Release builds remain available explicitly for distribution.
+
+**Consequences.** Non-arm64 devices can no longer be installed by the script
+without editing it -- acceptable; the project has exactly one device. The
+universal APK still exists in `build/app/outputs/flutter-apk/` for whenever
+it is needed.

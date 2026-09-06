@@ -152,7 +152,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
             curve: Curves.easeOut,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: chosen ? DuetColors.surfaceRaised : DuetColors.surface,
+              color: chosen ? SkinColors.instance.pal.surfaceRaised : SkinColors.instance.pal.surface,
               borderRadius: BorderRadius.circular(15),
               border: Border.all(
                   color: chosen

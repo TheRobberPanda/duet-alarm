@@ -67,7 +67,11 @@ class DuetApp extends StatelessWidget {
         // Painted once behind every screen, Navigator route changes included --
         // ThemeData.scaffoldBackgroundColor is transparent precisely so this
         // shows through instead of every screen needing its own backdrop.
-        builder: (context, child) => GirlyBackdrop(child: child ?? const SizedBox()),
+        // RepaintBoundary: it is static per theme, so it rasterises once and
+        // stays a cached layer while everything above it changes.
+        builder: (context, child) => RepaintBoundary(
+          child: GirlyBackdrop(child: child ?? const SizedBox()),
+        ),
         home: kBackendEnabled ? const AuthGate() : const HomeScreen(),
       );
 }
@@ -142,7 +146,10 @@ class _PairGateState extends State<PairGate> {
           SkinColors.instance.mine.toARGB32(),
           SkinColors.instance.partner.toARGB32(),
         );
-        // And the native side gets what the LAN fast path needs to sign and
+        // And the ringing screen gets the theme's world plus the partner's
+        // name -- it has no Flutter engine to read them from.
+        await pushCosmetics(partnerName: pair?.partner?.shortName);
+        // The native side also gets what the LAN fast path needs to sign and
         // authorise datagrams while the app itself is not running.
         await AlarmEngine.setPairContext(
           pairId: pair?.pairId,

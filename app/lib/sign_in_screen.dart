@@ -168,11 +168,11 @@ class _SignInScreenState extends State<SignInScreen> {
         hintStyle: const TextStyle(color: DuetColors.faint),
         labelStyle: const TextStyle(color: DuetColors.dim),
         filled: true,
-        fillColor: DuetColors.surface,
+        fillColor: SkinColors.instance.pal.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: DuetColors.line),
+          borderSide: BorderSide(color: SkinColors.instance.pal.line),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),

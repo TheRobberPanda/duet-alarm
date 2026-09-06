@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'alarm_engine.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -112,11 +114,11 @@ class GirlyBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SkinBuilder(
         builder: (context, skins) => DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [DuetColors.bgDeep, DuetColors.bg],
+            colors: [skins.pal.bgDeep, skins.pal.bg],
           ),
         ),
         child: Stack(
@@ -172,9 +174,19 @@ class SkinBuilder extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: SkinColors.instance,
-        builder: (context, _) => builder(context, SkinColors.instance),
+        builder: (context, skins) => builder(context, SkinColors.instance),
       );
 }
+
+/// Pushes the current theme's world down to the native ringing screen -- its
+/// background and (when paired) the partner's display name for the farewell
+/// message. Call wherever skins are pushed: pair resolution and theme picks.
+/// One helper, so the two callers can never drift.
+Future<void> pushCosmetics({String? partnerName}) =>
+    AlarmEngine.setCosmetics(
+      partnerName: partnerName,
+      bgColor: SkinColors.instance.pal.bgDeep.toARGB32(),
+    );
 
 /// A small, quiet decoration -- never the point of a layout, just a wink that
 /// this is Duet. Kept to one glyph size so a row of them never competes with
@@ -252,14 +264,18 @@ class DuetCard extends StatelessWidget {
           decoration: BoxDecoration(
             // Lit-from-top-left gradient body with a lighter rim on the first
             // stop -- the canvas's card treatment. An explicit [color] opts out
-            // (danger cards etc. stay solid).
+            // (danger cards etc. stay solid). Colors follow your theme.
             gradient: color != null
                 ? null
-                : const LinearGradient(
+                : LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    stops: [0, 0.45, 1],
-                    colors: [DuetColors.surfaceEdge, DuetColors.surfaceTop, DuetColors.surfaceBottom],
+                    stops: const [0, 0.45, 1],
+                    colors: [
+                      skins.pal.surfaceEdge,
+                      skins.pal.surfaceTop,
+                      skins.pal.surfaceBottom,
+                    ],
                   ),
             color: color?.withValues(alpha: 0.94),
             borderRadius: BorderRadius.circular(20),
@@ -453,19 +469,102 @@ class DuetPageRoute<T> extends PageRouteBuilder<T> {
 /// changes what color YOUR half of the ring paints, everywhere it appears,
 /// including on your partner's phone once their app re-reads your profile.
 class DuetSkin {
-  const DuetSkin(this.id, this.label, this.color, this.icon);
+  const DuetSkin(this.id, this.label, this.color, this.icon, this.palette);
 
   final String id;
   final String label;
   final Color color;
   final IconData icon;
+
+  /// The world the theme paints: backgrounds, surfaces and hairlines. Picking
+  /// a theme re-skins the whole app, not just the accents -- ADR-016.
+  final SkinPalette palette;
+
+  /// The theme's mascot -- the same glyph that rides your ring badges, shown
+  /// large and faint behind the home dial.
+  IconData get mascot => icon;
 }
 
-const duetSkins = [
-  DuetSkin('teal', 'Classic', DuetColors.teal, Icons.favorite_rounded),
-  DuetSkin('blue', 'Blue', Color(0xFF6FA8DC), Icons.water_drop_rounded),
-  DuetSkin('fish', 'Fish', Color(0xFF4FBFB0), Icons.set_meal_rounded),
-  DuetSkin('horse', 'Horse', Color(0xFFC99A6B), Icons.pets_rounded),
+/// A theme's own backgrounds. All dark, all tuned so [DuetColors.text] stays
+/// readable on every one -- a theme that traded legibility for personality
+/// would be a theme nobody can use at 06:00.
+class SkinPalette {
+  const SkinPalette({
+    required this.bgDeep,
+    required this.bg,
+    required this.surface,
+    required this.surfaceRaised,
+    required this.surfaceTop,
+    required this.surfaceEdge,
+    required this.surfaceBottom,
+    required this.line,
+  });
+
+  final Color bgDeep;
+  final Color bg;
+  final Color surface;
+  final Color surfaceRaised;
+  final Color surfaceTop;
+  final Color surfaceEdge;
+  final Color surfaceBottom;
+  final Color line;
+}
+
+const skinPalettes = <String, SkinPalette>{
+  // Classic: the original plum, unchanged -- the fallback everything else
+  // diverges from.
+  'teal': SkinPalette(
+    bgDeep: DuetColors.bgDeep,
+    bg: DuetColors.bg,
+    surface: DuetColors.surface,
+    surfaceRaised: DuetColors.surfaceRaised,
+    surfaceTop: DuetColors.surfaceTop,
+    surfaceEdge: DuetColors.surfaceEdge,
+    surfaceBottom: DuetColors.surfaceBottom,
+    line: DuetColors.line,
+  ),
+  // Blue: midnight navy -- the same night sky, a colder latitude.
+  'blue': SkinPalette(
+    bgDeep: Color(0xFF0C1018),
+    bg: Color(0xFF101623),
+    surface: Color(0xFF18212F),
+    surfaceRaised: Color(0xFF223045),
+    surfaceTop: Color(0xFF232E40),
+    surfaceEdge: Color(0xFF2B3A50),
+    surfaceBottom: Color(0xFF131A27),
+    line: Color(0xFF2E3C52),
+  ),
+  // Fish: a deep teal lagoon -- dim light through water.
+  'fish': SkinPalette(
+    bgDeep: Color(0xFF0A1416),
+    bg: Color(0xFF0E1A1D),
+    surface: Color(0xFF142427),
+    surfaceRaised: Color(0xFF1E3338),
+    surfaceTop: Color(0xFF1D3236),
+    surfaceEdge: Color(0xFF253C41),
+    surfaceBottom: Color(0xFF101D20),
+    line: Color(0xFF2A444C),
+  ),
+  // Horse: warm desert brown -- sundown on sand, the warmest of the four.
+  'horse': SkinPalette(
+    bgDeep: Color(0xFF171009),
+    bg: Color(0xFF1D1610),
+    surface: Color(0xFF271D14),
+    surfaceRaised: Color(0xFF33271B),
+    surfaceTop: Color(0xFF33271B),
+    surfaceEdge: Color(0xFF3E2F20),
+    surfaceBottom: Color(0xFF1F1710),
+    line: Color(0xFF423424),
+  ),
+};
+
+// final, not const: each entry indexes the palette map, which is not a const
+// expression. Cheap regardless -- built once, read-only afterwards.
+final duetSkins = [
+  DuetSkin('teal', 'Classic', DuetColors.teal, Icons.favorite_rounded, skinPalettes['teal']!),
+  DuetSkin('blue', 'Blue', Color(0xFF6FA8DC), Icons.water_drop_rounded, skinPalettes['blue']!),
+  DuetSkin('fish', 'Fish', Color(0xFF4FBFB0), Icons.set_meal_rounded, skinPalettes['fish']!),
+  DuetSkin('horse', 'Horse', Color(0xFFC99A6B), Icons.pets_rounded, skinPalettes['horse']!),
 ];
 
 DuetSkin skinFor(String? id) =>
@@ -489,9 +588,12 @@ class AnimatedSkinIcon extends StatefulWidget {
 
 class _AnimatedSkinIconState extends State<AnimatedSkinIcon>
     with SingleTickerProviderStateMixin {
+  // 1800ms, not faster: these glyphs animate for as long as their screen is
+  // alive, and a per-second heartbeat reads as alive while a per-half-second
+  // one reads as busy. Slow is the house style.
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(milliseconds: 1800),
   )..repeat();
 
   @override
@@ -565,6 +667,12 @@ class SkinColors extends ChangeNotifier {
   /// the ring.
   Color get accent => mine;
 
+  /// The world your theme paints: every background, surface and hairline in
+  /// the app reads from here, so picking a theme re-dresses the whole app
+  /// (ADR-016). Partner skins colour their half of the ring; backgrounds are
+  /// always YOURS.
+  SkinPalette get pal => mineSkin.palette;
+
   /// The two of you as one gradient: your color running into theirs. Used for
   /// every filled surface (buttons, the FAB, selected pills), so the pair is
   /// literally what the app is painted in. Unpaired, `partner` falls back to
@@ -604,6 +712,7 @@ class PairRing extends StatefulWidget {
     this.mineOn = true,
     this.strokeWidth = 2.5,
     this.animate = true,
+    this.fill = false,
     this.partnerExists,
   });
 
@@ -628,19 +737,53 @@ class PairRing extends StatefulWidget {
   final double strokeWidth;
   final bool animate;
 
+  /// Paint the inside of the ring as two vertical transparent halves, split
+  /// down the 12-to-6 axis: right half yours, left half theirs -- the same
+  /// split the arcs use, so the fill and the ring tell one story. Each side
+  /// only fills if that person has the alarm on; a dashed partner ("not
+  /// yet") leaves their half empty.
+  final bool fill;
+
   @override
   State<PairRing> createState() => _PairRingState();
 }
 
-class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin {
+class _PairRingState extends State<PairRing> with TickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 3),
   )..repeat(reverse: true);
 
+  // Drives the wave on the interior fill's seam. Only runs when a fill is
+  // actually on screen -- list rows and badges never pay for it. Two
+  // tickers, hence TickerProviderStateMixin (plural): the single-ticker
+  // variant asserts and throws a red box at runtime.
+  late final AnimationController _wave = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 6),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fill && widget.animate) _wave.repeat();
+  }
+
+  @override
+  void didUpdateWidget(PairRing old) {
+    super.didUpdateWidget(old);
+    final wanted = widget.fill && widget.animate;
+    if (wanted && !_wave.isAnimating) {
+      _wave.repeat();
+    } else if (!wanted && _wave.isAnimating) {
+      _wave.stop();
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
+    _wave.dispose();
     super.dispose();
   }
 
@@ -655,7 +798,7 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
     // ring's own breathing pulse -- Listenable.merge so one AnimatedBuilder
     // covers both without a second listener.
     return AnimatedBuilder(
-      animation: Listenable.merge([_controller, SkinColors.instance]),
+      animation: Listenable.merge([_controller, SkinColors.instance, _wave]),
       builder: (context, child) {
         final skins = SkinColors.instance;
         final r = (widget.size - widget.strokeWidth) / 2;
@@ -678,6 +821,9 @@ class _PairRingState extends State<PairRing> with SingleTickerProviderStateMixin
                   partnerExists: widget.partnerExists ?? widget.hasPartner,
                   mineOn: widget.mineOn,
                   strokeWidth: widget.strokeWidth,
+                  fill: widget.fill,
+                  wavePhase: _wave.value * math.pi * 2,
+                  line: skins.pal.line,
                   mine: skins.mine,
                   partner: skins.partner,
                 ),
@@ -728,6 +874,9 @@ class _PairRingPainter extends CustomPainter {
     required this.partnerExists,
     required this.mineOn,
     required this.strokeWidth,
+    required this.fill,
+    required this.wavePhase,
+    required this.line,
     required this.mine,
     required this.partner,
   });
@@ -739,6 +888,14 @@ class _PairRingPainter extends CustomPainter {
   final bool partnerExists;
   final bool mineOn;
   final double strokeWidth;
+
+  /// Interior fill up to the halfway line (see [PairRing.fill]).
+  final bool fill;
+
+  /// Drives the travelling wave on the fill's seam. Static when the ring
+  /// does not animate.
+  final double wavePhase;
+  final Color line;
   final Color mine;
   final Color partner;
 
@@ -757,16 +914,83 @@ class _PairRingPainter extends CustomPainter {
     }
   }
 
+  /// One half-disc of the interior: the arc from [start] sweeping [sweep],
+  /// closed back through the centre.
+  void halfFill(Canvas canvas, Rect rect, double start, double sweep, Color colour) {
+    final path = Path()
+      ..moveTo(rect.center.dx, rect.center.dy)
+      ..arcTo(rect, start, sweep, false)
+      ..close();
+    canvas.drawPath(path, Paint()..color = colour);
+  }
+
+  /// The seam between the two fills: a vertical wave through the centre,
+  /// damped to nothing at the top and bottom so it always meets the ring
+  /// exactly. [phase] animates it; both halves sample the same points, so
+  /// they join with no gap ever.
+  List<Offset> seamPoints(Offset c, double r, double phase) {
+    return List<Offset>.generate(13, (i) {
+      final u = i / 12;
+      final amp = r * 0.055 * math.sin(u * math.pi);
+      final x = c.dx + amp * math.sin(phase + u * math.pi * 4);
+      return Offset(x, c.dy - r + u * 2 * r);
+    });
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final r = (size.width - strokeWidth) / 2;
     final c = Offset(size.width / 2, size.height / 2);
     final rect = Rect.fromCircle(center: c, radius: r);
 
+    // Interior fills go first, behind everything: two vertical half-discs
+    // split at the 12-to-6 line -- right yours, left theirs -- with the seam
+    // between them a slow travelling wave when both are up. Alone, just your
+    // half fills; a dashed partner leaves their half empty.
+    if (fill) {
+      if (mineOn && hasPartner) {
+        final seam = seamPoints(c, r, wavePhase);
+
+        // Both halves start at 12 o'clock and sweep to 6 -- [dir] +1 down
+        // the right side (you), -1 down the left (them) -- then follow the
+        // shared seam back up. Identical seam points, so they join cleanly.
+        Path halfWithSeam(double dir) {
+          final path = Path()
+            ..moveTo(c.dx, c.dy - r)
+            ..arcTo(rect, -math.pi / 2, dir * math.pi, false);
+          for (var i = seam.length - 1; i >= 0; i--) {
+            path.lineTo(seam[i].dx, seam[i].dy);
+          }
+          return path..close();
+        }
+
+        canvas.drawPath(
+            halfWithSeam(1), Paint()..color = mine.withValues(alpha: 0.14));
+        canvas.drawPath(
+            halfWithSeam(-1), Paint()..color = partner.withValues(alpha: 0.14));
+
+        final seamPath = Path()..moveTo(seam.first.dx, seam.first.dy);
+        for (final p in seam) {
+          seamPath.lineTo(p.dx, p.dy);
+        }
+        canvas.drawPath(
+          seamPath,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1
+            ..color = DuetColors.text.withValues(alpha: 0.12),
+        );
+      } else if (mineOn) {
+        halfFill(canvas, rect, -math.pi / 2, math.pi, mine.withValues(alpha: 0.14));
+      } else if (hasPartner) {
+        halfFill(canvas, rect, math.pi / 2, math.pi, partner.withValues(alpha: 0.14));
+      }
+    }
+
     final track = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..color = DuetColors.line;
+      ..color = line;
     canvas.drawCircle(c, r, track);
 
     Paint arc(Color colour) => Paint()
@@ -793,6 +1017,9 @@ class _PairRingPainter extends CustomPainter {
       old.partnerExists != partnerExists ||
       old.mineOn != mineOn ||
       old.strokeWidth != strokeWidth ||
+      old.fill != fill ||
+      old.wavePhase != wavePhase ||
+      old.line != line ||
       old.mine != mine ||
       old.partner != partner;
 }
@@ -937,7 +1164,7 @@ class DuetSwitch extends StatelessWidget {
           activeThumbColor: DuetColors.amberInk,
           activeTrackColor: skins.mine,
           inactiveThumbColor: DuetColors.muted,
-          inactiveTrackColor: DuetColors.surfaceRaised,
+          inactiveTrackColor: skins.pal.surfaceRaised,
           trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
           // Your skin rides in the thumb of every switch -- the signature
           // follows your hand, not just the ring.
@@ -974,8 +1201,8 @@ class AvatarBadge extends StatelessWidget {
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: DuetColors.bgDeep,
-              border: Border.all(color: ring ? col : DuetColors.line, width: 1.4),
+              color: skins.pal.bgDeep,
+              border: Border.all(color: ring ? col : skins.pal.line, width: 1.4),
             ),
             alignment: Alignment.center,
             child: icon != null
@@ -1020,7 +1247,8 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
   }
 
   @override
-  Widget build(BuildContext context) => FadeTransition(
+  Widget build(BuildContext context) => SkinBuilder(
+        builder: (context, skins) => FadeTransition(
         opacity: Tween(begin: 0.35, end: 0.8).animate(
           CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
         ),
@@ -1028,9 +1256,10 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: DuetColors.surfaceRaised.withValues(alpha: 0.55),
+            color: skins.pal.surfaceRaised.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(widget.radius),
           ),
+        ),
         ),
       );
 }
@@ -1052,8 +1281,26 @@ class WaveformBars extends StatefulWidget {
 }
 
 class _WaveformBarsState extends State<WaveformBars> with SingleTickerProviderStateMixin {
-  late final _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 950))
-    ..repeat();
+  late final _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 950));
+
+  @override
+  void initState() {
+    super.initState();
+    // The controller runs ONLY while this row is actually playing. It used to
+    // repeat forever on every row on screen -- a dozen idle rows each
+    // repainting at 60fps was the single most wasteful thing in the app.
+    if (widget.playing) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(WaveformBars old) {
+    super.didUpdateWidget(old);
+    if (widget.playing && !old.playing) {
+      _controller.repeat();
+    } else if (!widget.playing && old.playing) {
+      _controller.stop();
+    }
+  }
 
   @override
   void dispose() {
@@ -1118,6 +1365,7 @@ class PressAndHoldButton extends StatefulWidget {
     this.icon = Icons.touch_app_rounded,
     this.destructive = false,
     this.height = 52,
+    this.doneLabel,
   });
 
   final String label;
@@ -1126,25 +1374,44 @@ class PressAndHoldButton extends StatefulWidget {
   final bool destructive;
   final double height;
 
+  /// Shown once the hold completes, until the parent removes the button.
+  final String? doneLabel;
+
   @override
   State<PressAndHoldButton> createState() => _PressAndHoldButtonState();
 }
 
 class _PressAndHoldButtonState extends State<PressAndHoldButton>
     with SingleTickerProviderStateMixin {
-  // Explicit type: the status-listener closure calls _controller.reverse(),
+  // Explicit type: the status-listener closure calls widget.onComplete(),
   // which the inferencer would otherwise read as a self-referencing cycle.
+  //
+  // 2000ms: the whole point of a hold is that it cannot happen by accident
+  // or in your sleep -- two full seconds of intent.
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 800),
+    duration: const Duration(milliseconds: 2000),
   )
     ..addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        HapticFeedback.mediumImpact();
+        // Haptics are release-only: dev builds stay silent on the bench
+        // (kDebugMode), real phones get the full buzz.
+        if (!kDebugMode) HapticFeedback.heavyImpact();
+        // The system alert blip: a deletion you can HEAR finished, on the
+        // sound stream the phone already owns. No new asset, no new package.
+        SystemSound.play(SystemSoundType.alert);
+        // Lock in the done state instead of rewinding -- the fill holds at
+        // full and the label becomes "Done" until the parent removes this
+        // button. Rewinding made the completion blink past unnoticed.
+        setState(() => _fired = true);
         widget.onComplete();
-        _controller.reverse();
       }
     });
+
+  /// Set when the hold completes; freezes the fill at full and swaps the
+  /// label, so a slow parent (an editor that pauses a beat before popping)
+  /// shows a done state instead of rewinding.
+  bool _fired = false;
 
   @override
   void dispose() {
@@ -1152,11 +1419,16 @@ class _PressAndHoldButtonState extends State<PressAndHoldButton>
     super.dispose();
   }
 
-  void _start() => _controller.forward();
+  void _start() {
+    if (_fired) return;
+    if (!kDebugMode) HapticFeedback.selectionClick();
+    _controller.forward();
+  }
   void _stop() {
-    // Only rewinds if not already completed -- a completed fire reverses
-    // itself in the status listener above.
-    if (_controller.status == AnimationStatus.forward) _controller.reverse();
+    // Only rewinds if not already completed -- a completed hold stays done.
+    if (!_fired && _controller.status == AnimationStatus.forward) {
+      _controller.reverse();
+    }
   }
 
   @override
@@ -1176,7 +1448,8 @@ class _PressAndHoldButtonState extends State<PressAndHoldButton>
             child: AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
-                final v = _controller.value;
+                // Once fired, the fill holds at full -- frozen, not rewound.
+                final v = _fired ? 1.0 : _controller.value;
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(15),
                   child: Stack(
@@ -1184,7 +1457,7 @@ class _PressAndHoldButtonState extends State<PressAndHoldButton>
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: DuetColors.surface.withValues(alpha: 0.9),
+                          color: SkinColors.instance.pal.surface.withValues(alpha: 0.9),
                           borderRadius: BorderRadius.circular(15),
                           border: Border.all(color: tint.withValues(alpha: 0.3 + 0.3 * v)),
                         ),
@@ -1200,11 +1473,23 @@ class _PressAndHoldButtonState extends State<PressAndHoldButton>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(widget.icon,
-                                size: 17, color: Color.lerp(DuetColors.muted, tint, v)),
+                            // The icon tells the truth about the press:
+                            // delete while you start, check as the hold
+                            // completes.
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              child: Icon(
+                                v > 0.92
+                                    ? Icons.check_rounded
+                                    : widget.icon,
+                                key: ValueKey(v > 0.92),
+                                size: 17,
+                                color: Color.lerp(DuetColors.muted, tint, v),
+                              ),
+                            ),
                             const SizedBox(width: 8),
                             Text(
-                              widget.label,
+                              _fired ? (widget.doneLabel ?? 'Done') : widget.label,
                               style: TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w600,
@@ -1245,11 +1530,15 @@ Future<T?> showDuetDialog<T>({
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              stops: [0, 0.45, 1],
-              colors: [DuetColors.surfaceEdge, DuetColors.surfaceTop, DuetColors.surfaceBottom],
+              stops: const [0, 0.45, 1],
+              colors: [
+                SkinColors.instance.pal.surfaceEdge,
+                SkinColors.instance.pal.surfaceTop,
+                SkinColors.instance.pal.surfaceBottom,
+              ],
             ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: skins.accent.withValues(alpha: 0.2)),
@@ -1311,23 +1600,36 @@ class DuetDialogAction extends StatelessWidget {
       );
 }
 
-/// The one snackbar. Glass plum with the accent (or danger) leading an icon --
-/// the stock [SnackBar] rendered as a raw platform slab.
-void showDuetSnackBar(BuildContext context, String text, {IconData? icon, bool error = false}) {
+/// The one snackbar. Glass plum with the accent (or danger) leading an icon,
+/// optionally carrying a single action -- the delete toast lives on this.
+void showDuetSnackBar(
+  BuildContext context,
+  String text, {
+  IconData? icon,
+  bool error = false,
+  String? action,
+  VoidCallback? onAction,
+}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
+        duration: action == null
+            ? const Duration(seconds: 4)
+            : const Duration(seconds: 6), // an action needs reading time
         elevation: 0,
         backgroundColor: Colors.transparent,
         content: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [DuetColors.surfaceTop, DuetColors.surfaceBottom],
+              colors: [
+                SkinColors.instance.pal.surfaceTop,
+                SkinColors.instance.pal.surfaceBottom,
+              ],
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
@@ -1352,9 +1654,101 @@ void showDuetSnackBar(BuildContext context, String text, {IconData? icon, bool e
               Expanded(
                 child: Text(text, style: const TextStyle(fontSize: 14, color: DuetColors.text)),
               ),
+              if (action != null)
+                TextButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    onAction?.call();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                        error ? DuetColors.danger : SkinColors.instance.accent,
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  child: Text(action),
+                ),
             ],
           ),
         ),
       ),
     );
+}
+
+/// The theme's mascot standing faintly behind the home dial -- a watermark of
+/// the world you picked, lit with the pair gradient so it is literally the
+/// two of you. One large glyph, one slow motion per theme (the same mapping
+/// as [AnimatedSkinIcon], amplitudes halved: behind the dial it may only
+/// breathe, never perform).
+class MascotBehindRing extends StatefulWidget {
+  const MascotBehindRing({super.key, this.size = 340, this.opacity = 1.0});
+
+  final double size;
+  final double opacity;
+
+  @override
+  State<MascotBehindRing> createState() => _MascotBehindRingState();
+}
+
+class _MascotBehindRingState extends State<MascotBehindRing>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 4200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SkinBuilder(
+        builder: (context, skins) {
+          final skin = skins.mineSkin;
+          return IgnorePointer(
+            child: SizedBox(
+              width: widget.size,
+              height: widget.size,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  final t = _controller.value;
+                  Widget glyph = ShaderMask(
+                    shaderCallback: (bounds) => skins.wash.createShader(bounds),
+                    blendMode: BlendMode.srcIn,
+                    child: Icon(
+                      skin.mascot,
+                      size: widget.size * 0.62,
+                      color: Colors.white,
+                    ),
+                  );
+                  switch (skin.id) {
+                    case 'teal': // heartbeat, half strength
+                      final beat =
+                          (t < 0.25 ? (t / 0.25) : (t < 0.5 ? 1 - (t - 0.25) / 0.25 : 0));
+                      glyph = Transform.scale(scale: 1 + beat * 0.05, child: glyph);
+                    case 'blue': // slow rise and settle
+                      glyph = Transform.translate(
+                        offset: Offset(0, math.sin(t * 2 * math.pi) * 5),
+                        child: glyph,
+                      );
+                    case 'fish': // a lazy drift, not a swim
+                      glyph = Transform.rotate(
+                        angle: math.sin(t * 2 * math.pi) * 0.06,
+                        child: glyph,
+                      );
+                    case 'horse': // a trot at walking pace
+                      glyph = Transform.translate(
+                        offset: Offset(0, -math.sin(t * 2 * math.pi * 2).abs() * 4),
+                        child: glyph,
+                      );
+                  }
+                  return Opacity(opacity: 0.09 * widget.opacity, child: glyph);
+                },
+              ),
+            ),
+          );
+        },
+      );
 }

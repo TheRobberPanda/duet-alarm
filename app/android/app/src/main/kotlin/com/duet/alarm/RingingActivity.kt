@@ -68,6 +68,14 @@ class RingingActivity : Activity() {
     private var pairId: String? = null
     private var awarenessWrap: View? = null
     private lateinit var awarenessText: TextView
+
+    // Last state the poll or LAN relay reported for your partner -- the
+    // farewell message is derived from it, so an uncertain state says nothing
+    // rather than a wrong name.
+    private var lastPartnerState: String? = null
+
+    private lateinit var rootLayout: LinearLayout
+    private val farewellHandler = Handler(Looper.getMainLooper())
     private val pollHandler = Handler(Looper.getMainLooper())
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
@@ -123,6 +131,7 @@ class RingingActivity : Activity() {
     }
 
     private fun showAwareness(state: String?) {
+        lastPartnerState = state ?: lastPartnerState
         val wrap = awarenessWrap ?: return
         val text = when (state) {
             "ringing" -> "They're ringing too"
@@ -139,8 +148,12 @@ class RingingActivity : Activity() {
     }
 
     /** The one bit of feedback a gesture needs when the screen is about to
-     *  close anyway -- there is no time for a visual confirmation to register. */
+     *  close anyway -- there is no time for a visual confirmation to register.
+     *  Release-only: debug builds (dev testing on the bench) stay silent.
+     *  BuildConfig is not generated in this project (AGP 8 default), so the
+     *  app's own FLAG_DEBUGGABLE is the dev-mode signal. */
     private fun vibrateConfirm() {
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) return
         @Suppress("DEPRECATION")
         val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         v?.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
@@ -179,6 +192,7 @@ class RingingActivity : Activity() {
 
     override fun onDestroy() {
         pollHandler.removeCallbacksAndMessages(null)
+        farewellHandler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(ringEnded) }
         runCatching { unregisterReceiver(partnerStateOverLan) }
         super.onDestroy()
@@ -204,10 +218,12 @@ class RingingActivity : Activity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     private fun buildUi(): View {
-        val root = LinearLayout(this).apply {
+        rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(BG_DEEP)
+            // Your theme's background, pushed down from Dart (AuthStore
+            // setCosmetics). 06:00 should look like the app you went to bed with.
+            setBackgroundColor(AuthStore.bgColor(this@RingingActivity, BG_DEEP))
             setPadding(dp(24), dp(40), dp(24), dp(28))
         }
 
@@ -268,8 +284,8 @@ class RingingActivity : Activity() {
             FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER)
         )
 
-        root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
-        root.addView(dial, LinearLayout.LayoutParams(dp(268), dp(268)))
+        rootLayout.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
+        rootLayout.addView(dial, LinearLayout.LayoutParams(dp(268), dp(268)))
 
         // Milestone 4's live awareness strip, dressed as the canvas's glassy
         // pill instead of bare text. Empty and GONE until polling finds a
@@ -290,11 +306,11 @@ class RingingActivity : Activity() {
             addView(awarenessText)
             visibility = View.GONE
         }
-        root.addView(awarenessWrap, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+        rootLayout.addView(awarenessWrap, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             topMargin = dp(18)
         })
 
-        root.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
+        rootLayout.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
 
         // ── Controls ─────────────────────────────────────────────────────────
         // These stop YOUR phone only. The "for both of us" variants belong here
@@ -325,9 +341,9 @@ class RingingActivity : Activity() {
                 if (snoozesLeft > 0) leftMargin = dp(6)
             }
         )
-        root.addView(controls, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        rootLayout.addView(controls, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
-        root.addView(TextView(this).apply {
+        rootLayout.addView(TextView(this).apply {
             text = listOfNotNull(
                 when {
                     maxSnoozes == 0 -> "Snooze is off for this alarm"
@@ -343,7 +359,7 @@ class RingingActivity : Activity() {
             setPadding(dp(20), dp(14), dp(20), 0)
         })
 
-        return root
+        return rootLayout
     }
 
     private fun actionButton(
@@ -383,10 +399,133 @@ class RingingActivity : Activity() {
 
     private fun dismiss() {
         alarmId?.let { AlarmActions.dismiss(this, it, pairId) }
-        finishRinging()
+        // Snooze and dismiss both stop the ring, but only a DISMISS earns the
+        // farewell: the little "you're up" moment needs to feel earned, and a
+        // snooze that celebrated would be lying.
+        showFarewell()
+    }
+
+    /**
+     * The farewell: a beat of celebration between "you stopped the alarm" and
+     * the screen going away. A check that pops in, a few hearts floating up,
+     * and -- when the partner poll knows something for sure -- who woke
+     * first. An uncertain state says nothing rather than a wrong name; a solo
+     * ring gets the animation alone.
+     */
+    private fun showFarewell() {
+        val partner = AuthStore.partnerName(this)
+        val message = when {
+            partner == null -> null // solo: the animation speaks for itself
+            lastPartnerState == "dismissed" -> "$partner beat you to it"
+            lastPartnerState == null -> null // poll found no row yet: no claim
+            else -> "You woke up before $partner" // ringing, snoozed, missed
+        }
+
+        val mine = AuthStore.skinMine(this, Color.parseColor("#C9AEE8"))
+        val them = AuthStore.skinPartner(this, Color.parseColor("#F0A8C8"))
+
+        val overlay = FrameLayout(this).apply {
+            setBackgroundColor(AuthStore.bgColor(this@RingingActivity, BG_DEEP))
+            isClickable = true // swallow touches; nothing behind it is reachable now
+        }
+
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+
+        // The check, drawn as a filled circle in your color, popping in.
+        val check = TextView(this).apply {
+            text = "✓"
+            textSize = 44f
+            setTextColor(ON_ACCENT)
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                colors = intArrayOf(mine, them)
+                orientation = GradientDrawable.Orientation.TL_BR
+            }
+        }
+        val checkSize = dp(96)
+        column.addView(check, LinearLayout.LayoutParams(checkSize, checkSize).apply { gravity = Gravity.CENTER_HORIZONTAL })
+
+        if (message != null) {
+            column.addView(TextView(this).apply {
+                text = message
+                setTextColor(TEXT)
+                textSize = 17f
+                letterSpacing = 0.02f
+                gravity = Gravity.CENTER
+                setPadding(0, dp(22), 0, 0)
+            }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+
+        overlay.addView(column, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER))
+
+        // Hearts: your color and theirs floating up from random points along
+        // the bottom -- the two of you, rising. Cheap Views, one animator.
+        for (i in 0 until 7) {
+            val heart = TextView(this).apply {
+                text = "♥"
+                textSize = (14 + (i % 3) * 8).toFloat()
+                setTextColor(if (i % 2 == 0) mine else them)
+                alpha = 0f
+                x = resources.displayMetrics.widthPixels * (0.12f + 0.12f * i)
+            }
+            overlay.addView(heart, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM))
+            val rise = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 1200
+                startDelay = (80 * i).toLong()
+                interpolator = AccelerateDecelerateInterpolator()
+                addUpdateListener {
+                    val t = it.animatedValue as Float
+                    heart.translationY = -t * dp(300)
+                    heart.alpha = if (t < 0.15f) t / 0.15f else 1f - (t - 0.15f) / 0.85f
+                }
+            }
+            rise.start()
+        }
+
+        rootLayout.addView(overlay, LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+
+        // Check pops in with a little overshoot -- small enough to stay
+        // gentle, big enough to feel like a bell being struck.
+        check.scaleX = 0f
+        check.scaleY = 0f
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 420
+            interpolator = android.view.animation.OvershootInterpolator(1.6f)
+            addUpdateListener {
+                val s = it.animatedValue as Float
+                check.scaleX = s
+                check.scaleY = s
+            }
+            start()
+        }
+
+        // One beat and a half, then gone. No transition -- same rule as ever.
+        farewellHandler.postDelayed({ finishRinging() }, 1500)
+    }
+
+    /** Back to rest. If the phone was locked when the alarm rang and STILL is
+     *  -- you dismissed from bed without ever unlocking -- the least
+     *  surprising thing is for the screen to go back to sleep, not to sit on
+     *  the lockscreen glowing. Android has no public "re-lock and sleep" for
+     *  a non-admin app, but clearing the keep-screen-on flags before
+     *  finishing hands the display back to the system's own screen timeout.
+     *  A phone that was unlocked before the ring is left exactly as it was.
+     */
+    private fun returnToRest() {
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (km.isKeyguardLocked) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            setShowWhenLocked(false)
+            setTurnScreenOn(false)
+        }
     }
 
     private fun finishRinging() {
+        returnToRest()
         finish()
         // No transition -- at 06:00 an animation just looks like a stutter.
         overridePendingTransition(0, 0)
@@ -428,6 +567,11 @@ private class PairRingView(
     private val youHalo = Paint(Paint.ANTI_ALIAS_FLAG)
     private val themHalo = Paint(Paint.ANTI_ALIAS_FLAG)
 
+    // Shaders are rebuilt only when the view changes size -- allocating two
+    // RadialGradients per frame was pure waste on a screen that redraws at
+    // breathe-rate forever.
+    private var shaderWidth = 0
+
     // 0..1, slow, reversing -- the same 82-100% opacity and ~3.5% scale the
     // Flutter ring breathes between.
     private val breathe = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -449,12 +593,24 @@ private class PairRingView(
     }
 
     private fun haloPaint(paint: Paint, color: Int, cx: Float, cy: Float, radius: Float) {
-        paint.shader = RadialGradient(
-            cx, cy, radius,
-            ColorUtils.setAlphaComponent(color, 33),
-            ColorUtils.setAlphaComponent(color, 0),
-            Shader.TileMode.CLAMP
-        )
+        if (shaderWidth != width) {
+            shaderWidth = width
+            val r = width / 2f
+            val w = width / 2f
+            val h = height / 2f
+            youHalo.shader = RadialGradient(
+                w + r * 0.22f, h - r * 0.18f, r,
+                ColorUtils.setAlphaComponent(you.color, 33),
+                ColorUtils.setAlphaComponent(you.color, 0),
+                Shader.TileMode.CLAMP
+            )
+            themHalo.shader = RadialGradient(
+                w - r * 0.24f, h + r * 0.20f, r,
+                ColorUtils.setAlphaComponent(them.color, 33),
+                ColorUtils.setAlphaComponent(them.color, 0),
+                Shader.TileMode.CLAMP
+            )
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -473,10 +629,9 @@ private class PairRingView(
         // light standing behind the dial, the same trick the Flutter side's
         // HaloGlow does.
         val haloRadius = width / 2f
-        haloPaint(youHalo, you.color, cx + haloRadius * 0.22f, cy - haloRadius * 0.18f, haloRadius)
-        haloPaint(themHalo, them.color, cx - haloRadius * 0.24f, cy + haloRadius * 0.20f, haloRadius)
-        youHalo.alpha = (140 + 80 * t).toInt()
+        haloPaint(youHalo, you.color, cx, cy, haloRadius)
         themHalo.alpha = (115 + 65 * t).toInt()
+        youHalo.alpha = (140 + 80 * t).toInt()
         canvas.drawCircle(cx + haloRadius * 0.22f, cy - haloRadius * 0.18f, haloRadius, youHalo)
         canvas.drawCircle(cx - haloRadius * 0.24f, cy + haloRadius * 0.20f, haloRadius, themHalo)
 

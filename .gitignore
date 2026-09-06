@@ -36,3 +36,6 @@ ID docs/
 *.jpeg
 *.heic
 !app/android/app/src/main/res/**
+
+# Build artifacts -- a 35 MB APK does not belong in git history.
+*.apk

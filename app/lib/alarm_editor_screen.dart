@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'alarm.dart';
 import 'alarm_engine.dart';
 import 'alarm_repository.dart';
+import 'clock_picker.dart';
 import 'next_fire.dart';
 import 'sound_picker_screen.dart';
 import 'theme.dart';
@@ -72,12 +75,25 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
   }
 
   // The platform showTimePicker is gone: it opened as a stock modal in the
-  // middle of an otherwise bespoke screen, and the canvases specify the hero
-  // time edited right where it stands. Hour and minute each get a chevron
-  // pair; both wrap (23 -> 0, 59 -> 0).
+  // middle of an otherwise bespoke screen. The hero time is edited right
+  // where it stands -- chevrons for one-minute nudges, the plum clock dial
+  // (below) for seeing the hour laid out.
   void _bumpHour(int delta) => setState(() => _hour = (_hour + delta + 24) % 24);
 
   void _bumpMinute(int delta) => setState(() => _minute = (_minute + delta + 60) % 60);
+
+  Future<void> _openClock() async {
+    final picked = await showDuetClockPicker(
+      context,
+      hour: _hour,
+      minute: _minute,
+    );
+    if (picked == null) return;
+    setState(() {
+      _hour = picked.$1;
+      _minute = picked.$2;
+    });
+  }
 
   Future<void> _pickSound() async {
     final chosen = await Navigator.of(context).push<String>(
@@ -121,6 +137,11 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
   Future<void> _delete() async {
     final a = widget.alarm;
     if (a == null) return;
+    // The hold button has just locked into its done state (check, "Deleted",
+    // sound). Give the eye the beat it needs to register that before the
+    // screen vanishes -- deleting faster than you can see it is not snappy,
+    // it is unreadable.
+    await Future<void>.delayed(const Duration(milliseconds: 750));
     await _repo.delete(a.id);
     if (mounted) Navigator.of(context).pop(true);
   }
@@ -153,27 +174,50 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 4, 18, 40),
         children: [
+          // WHO RINGS, FIRST -- before the time, because whose phone this
+          // alarm wakes is the whole point of the app; the time is secondary
+          // to the question of who answers it.
+          const SectionLabel('Who rings'),
+          const SizedBox(height: 6),
+          Center(
+            child: WhoRingsPicker(
+              target: _target,
+              onChanged: (t) => setState(() => _target = t),
+            ),
+          ),
+          const SizedBox(height: 22),
+
           Column(
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(
-                        fontSize: 74,
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: 2,
-                        color: DuetColors.text,
-                        fontFeatures: [FontFeature.tabularFigures()]),
+              // The time itself opens the clock dial -- the steppers are for
+              // nudging, the dial is for seeing.
+              InkWell(
+                onTap: _openClock,
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                            fontSize: 74,
+                            fontWeight: FontWeight.w300,
+                            letterSpacing: 2,
+                            color: DuetColors.text,
+                            fontFeatures: [FontFeature.tabularFigures()]),
+                      ),
+                      const SizedBox(width: 8),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 14),
+                        child: HeartAccent(size: 18),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 14),
-                    child: HeartAccent(size: 18),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 6),
               _timeSteppers(),
@@ -235,9 +279,6 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           ),
           const SizedBox(height: 18),
 
-          const SectionLabel('Who rings'),
-          const SizedBox(height: 10),
-          _targetSelector(),
           const SizedBox(height: 18),
 
           const SectionLabel('Snooze'),
@@ -296,9 +337,9 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               gradient: on ? SkinColors.instance.wash : null,
-              color: on ? null : DuetColors.surface,
+              color: on ? null : SkinColors.instance.pal.surface,
               shape: BoxShape.circle,
-              border: on ? null : Border.all(color: DuetColors.line),
+              border: on ? null : Border.all(color: SkinColors.instance.pal.line),
               boxShadow: on
                   ? [BoxShadow(
                       color: SkinColors.instance.accent.withValues(alpha: 0.25),
@@ -346,9 +387,9 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
             padding: const EdgeInsets.symmetric(vertical: 3),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: DuetColors.surface.withValues(alpha: 0.7),
+              color: SkinColors.instance.pal.surface.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: DuetColors.line.withValues(alpha: 0.6)),
+              border: Border.all(color: SkinColors.instance.pal.line.withValues(alpha: 0.6)),
             ),
             child: Text(value,
                 style: const TextStyle(
@@ -419,39 +460,6 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
         ),
       );
 
-  Widget _targetSelector() => Container(
-        padding: const EdgeInsets.all(5),
-        decoration: BoxDecoration(
-          color: DuetColors.surface,
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Row(
-          children: RingTarget.values.map((t) {
-            final on = t == _target;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _target = t),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: on ? SkinColors.instance.wash : null,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Text(t.label,
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: on ? FontWeight.w600 : FontWeight.w400,
-                          color: on ? DuetColors.amberInk : DuetColors.dim)),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      );
-
   Widget _snoozeRow() => DuetCard(
         child: Column(children: [
           Row(children: [
@@ -512,4 +520,209 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
               color: onTap == null ? DuetColors.faint : SkinColors.instance.accent),
         ),
       );
+}
+
+/// The graphical who-rings selector: one circle, two halves. Tapping a half
+/// toggles that person in or out of the alarm, so "both of us" is simply the
+/// state where both halves are lit. The last lit side never goes dark -- an
+/// alarm that rings for nobody is not an alarm. On every change the lit
+/// fill sweeps in animated, the way the home dial wears it, and the
+/// excluded side goes quiet.
+class WhoRingsPicker extends StatelessWidget {
+  const WhoRingsPicker({super.key, required this.target, required this.onChanged});
+
+  final RingTarget target;
+  final ValueChanged<RingTarget> onChanged;
+
+  static const _size = 190.0;
+
+  void _pick(Offset local) {
+    final dx = local.dx - _size / 2;
+    // Right half toggles you, left half toggles them. Turning off the only
+    // lit side is refused: the alarm must keep at least one ringer.
+    final RingTarget next;
+    if (dx >= 0) {
+      next = switch (target) {
+        RingTarget.both => RingTarget.partner,
+        RingTarget.owner => RingTarget.owner,
+        RingTarget.partner => RingTarget.both,
+      };
+    } else {
+      next = switch (target) {
+        RingTarget.both => RingTarget.owner,
+        RingTarget.owner => RingTarget.both,
+        RingTarget.partner => RingTarget.partner,
+      };
+    }
+    if (next != target) onChanged(next);
+  }
+
+  @override
+  Widget build(BuildContext context) => SkinBuilder(
+        builder: (context, skins) => Column(
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (d) => _pick(d.localPosition),
+              child: TweenAnimationBuilder<double>(
+                key: ValueKey(target),
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 550),
+                curve: Curves.easeOutCubic,
+                builder: (context, t, _) => SizedBox(
+                  width: _size,
+                  height: _size,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        size: const Size(_size, _size),
+                        painter: _WhoRingsPainter(
+                          target: target,
+                          progress: t,
+                          mine: skins.mine,
+                          partner: skins.partner,
+                          line: skins.pal.line,
+                        ),
+                      ),
+                      // Whose side is whose: your glyph rides the right
+                      // edge, theirs the left, each scaling away when the
+                      // selection excludes them.
+                      Positioned(
+                        left: 2,
+                        child: _sideBadge(
+                          skins.partnerSkin?.icon ?? Icons.favorite_rounded,
+                          skins.partner,
+                          included: target != RingTarget.owner,
+                          t: t,
+                        ),
+                      ),
+                      Positioned(
+                        right: 2,
+                        child: _sideBadge(
+                          skins.mineSkin.icon,
+                          skins.mine,
+                          included: target != RingTarget.partner,
+                          t: t,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: Text(
+                target.label,
+                key: ValueKey(target.label),
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: DuetColors.text),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _sideBadge(IconData icon, Color color,
+          {required bool included, required double t}) =>
+      Transform.scale(
+        scale: included ? 1 : 0.6 + 0.4 * (1 - t),
+        child: Opacity(
+          opacity: included ? 1 : 0.25,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: DuetColors.bgDeep.withValues(alpha: 0.9),
+              border: Border.all(color: color, width: 1.4),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+        ),
+      );
+}
+
+class _WhoRingsPainter extends CustomPainter {
+  _WhoRingsPainter({
+    required this.target,
+    required this.progress,
+    required this.mine,
+    required this.partner,
+    required this.line,
+  });
+
+  final RingTarget target;
+  final double progress;
+  final Color mine;
+  final Color partner;
+  final Color line;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 4.0;
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 - stroke;
+    final rect = Rect.fromCircle(center: c, radius: r);
+
+    // Track.
+    canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = line);
+
+    final sweep = math.pi * progress;
+    Paint fill(Color colour) => Paint()..color = colour.withValues(alpha: 0.16 * progress);
+    Paint arc(Color colour) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = colour;
+
+    bool mineOn, partnerOn;
+    switch (target) {
+      case RingTarget.both:
+        mineOn = partnerOn = true;
+      case RingTarget.owner:
+        mineOn = true;
+        partnerOn = false;
+      case RingTarget.partner:
+        mineOn = false;
+        partnerOn = true;
+    }
+
+    // Fills sweep in as pie wedges from 12 o'clock -- the same gesture the
+    // home dial's fill makes, at half a second.
+    if (mineOn) {
+      final path = Path()
+        ..moveTo(c.dx, c.dy)
+        ..arcTo(rect, -math.pi / 2, sweep, false)
+        ..close();
+      canvas.drawPath(path, fill(mine));
+      canvas.drawArc(rect, -math.pi / 2, sweep, false, arc(mine));
+    }
+    if (partnerOn) {
+      final path = Path()
+        ..moveTo(c.dx, c.dy)
+        ..arcTo(rect, -math.pi / 2, -sweep, false)
+        ..close();
+      canvas.drawPath(path, fill(partner));
+      canvas.drawArc(rect, -math.pi / 2, -sweep, false, arc(partner));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WhoRingsPainter old) =>
+      old.target != target ||
+      old.progress != progress ||
+      old.mine != mine ||
+      old.partner != partner ||
+      old.line != line;
 }

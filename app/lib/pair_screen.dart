@@ -161,8 +161,8 @@ class _PairScreenState extends State<PairScreen> {
         padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
-          color: DuetColors.surface,
-          border: Border.all(color: DuetColors.line),
+          color: SkinColors.instance.pal.surface,
+          border: Border.all(color: SkinColors.instance.pal.line),
         ),
         child: Column(
           children: [
@@ -249,9 +249,9 @@ class _PairScreenState extends State<PairScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: DuetColors.bg,
+                      color: SkinColors.instance.pal.bg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: DuetColors.line),
+                      border: Border.all(color: SkinColors.instance.pal.line),
                     ),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
@@ -361,11 +361,11 @@ class _PairScreenState extends State<PairScreen> {
             hintText: 'ABC123',
             hintStyle: const TextStyle(color: DuetColors.faint, letterSpacing: 10),
             filled: true,
-            fillColor: DuetColors.surface,
+            fillColor: SkinColors.instance.pal.surface,
             contentPadding: const EdgeInsets.symmetric(vertical: 20),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: DuetColors.line),
+              borderSide: BorderSide(color: SkinColors.instance.pal.line),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),

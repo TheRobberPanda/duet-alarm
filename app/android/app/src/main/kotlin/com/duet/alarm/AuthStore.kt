@@ -27,6 +27,8 @@ object AuthStore {
     private const val KEY_ALLOW_PARTNER_DISMISS = "allow_partner_dismiss"
     private const val KEY_SKIN_MINE = "skin_mine"
     private const val KEY_SKIN_PARTNER = "skin_partner"
+    private const val KEY_PARTNER_NAME = "partner_name"
+    private const val KEY_BG_COLOR = "bg_color"
 
     private fun prefs(ctx: Context) =
         ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -74,6 +76,25 @@ object AuthStore {
 
     fun skinPartner(ctx: Context, fallback: Int): Int =
         prefs(ctx).getInt(KEY_SKIN_PARTNER, 0).takeIf { it != 0 } ?: fallback
+
+    /**
+     * The cosmetic cosmetics: your partner's display name (for the farewell
+     * message when a ring ends) and your theme's background color, so the
+     * ringing screen dresses in the same world the app does. Both pushed from
+     * Dart; 0 / null mean "never set" and the built-in defaults hold.
+     */
+    fun setCosmetics(ctx: Context, partnerName: String?, bgColor: Int) {
+        prefs(ctx).edit()
+            .putString(KEY_PARTNER_NAME, partnerName)
+            .putInt(KEY_BG_COLOR, bgColor)
+            .apply()
+    }
+
+    fun partnerName(ctx: Context): String? =
+        prefs(ctx).getString(KEY_PARTNER_NAME, null)?.takeIf { it.isNotBlank() }
+
+    fun bgColor(ctx: Context, fallback: Int): Int =
+        prefs(ctx).getInt(KEY_BG_COLOR, 0).takeIf { it != 0 } ?: fallback
 
     fun accessToken(ctx: Context): String? = prefs(ctx).getString(KEY_TOKEN, null)
     fun userId(ctx: Context): String? = prefs(ctx).getString(KEY_USER, null)

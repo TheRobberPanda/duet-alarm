@@ -14,10 +14,16 @@ shift || true
 # Remaining args go straight to the build, e.g.
 #   ./tool/install.sh debug --dart-define=DUET_BACKEND=true
 cd app
-flutter build apk --"$MODE" "$@"
-APK="build/app/outputs/flutter-apk/app-$MODE.apk"
+# Per-ABI, and this phone is arm64-only: a universal debug APK ships four
+# ABIs (~180 MB); the arm64 slice is a third of that and installs faster.
+# Stays DEBUG deliberately -- release builds get versionCode 2001+, and a
+# later debug downgrade is an uninstall that wipes the Supabase session
+# (docs/14 gotcha 3). `./tool/install.sh release` still works for real
+# distribution builds when you actually want one.
+flutter build apk --"$MODE" --split-per-abi "$@"
+APK="build/app/outputs/flutter-apk/app-arm64-v8a-$MODE.apk"
 
 adb push "$APK" /data/local/tmp/duet.apk
 adb shell pm install -r -t /data/local/tmp/duet.apk
 adb shell am start -n com.duet.alarm/.MainActivity
-echo "installed and launched ($MODE)"
+echo "installed and launched ($MODE, arm64)"

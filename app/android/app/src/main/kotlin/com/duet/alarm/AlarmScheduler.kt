@@ -15,7 +15,16 @@ import android.util.Log
 object AlarmScheduler {
     private const val TAG = "DuetScheduler"
 
-    private fun pendingIntent(ctx: Context, id: String, flags: Int): PendingIntent {
+    /**
+     * Nullable ON PURPOSE: with FLAG_NO_CREATE the platform returns null when
+     * no matching PendingIntent exists -- which is the normal state when
+     * dismissing an alarm that has already fired, because AlarmManager drops
+     * the entry once it fires. Declaring this non-null made Kotlin throw an
+     * NPE exactly there, crashing the app on every Dismiss (the caller's
+     * `?.let` never even ran). Callers that CREATE (arm) can never see null;
+     * callers that only LOOK UP (disarm) must handle it.
+     */
+    private fun pendingIntent(ctx: Context, id: String, flags: Int): PendingIntent? {
         val intent = Intent(ctx, AlarmReceiver::class.java).apply {
             action = AlarmReceiver.ACTION_FIRE
             putExtra(AlarmReceiver.EXTRA_ALARM_ID, id)
@@ -30,10 +39,13 @@ object AlarmScheduler {
         AlarmStore.put(ctx, def)
 
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        // With UPDATE_CURRENT this always creates; null would mean the system
+        // refused (security policy), which must be loud, never swallowed --
+        // an alarm armed silently is worse than one that fails loudly.
         val fire = pendingIntent(
             ctx, def.id,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        ) ?: error("AlarmManager refused the fire PendingIntent for ${def.id}")
 
         // Tapping the status-bar alarm icon should bring the user to our app.
         val showIntent = PendingIntent.getActivity(

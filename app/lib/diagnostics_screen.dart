@@ -59,9 +59,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: DuetColors.bgDeep.withValues(alpha: 0.7),
+          color: SkinColors.instance.pal.bgDeep.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: DuetColors.line.withValues(alpha: 0.5)),
+          border: Border.all(color: SkinColors.instance.pal.line.withValues(alpha: 0.5)),
         ),
         child: Text(text, style: _mono(color)),
       );
@@ -81,7 +81,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       body: RefreshIndicator(
         onRefresh: _refresh,
         color: SkinColors.instance.accent,
-        backgroundColor: DuetColors.surface,
+        backgroundColor: SkinColors.instance.pal.surface,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 40),
           children: [
