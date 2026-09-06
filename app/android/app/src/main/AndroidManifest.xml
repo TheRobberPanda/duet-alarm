@@ -91,6 +91,20 @@
             <intent-filter>
                 <action android:name="com.duet.alarm.action.SNOOZE" />
                 <action android:name="com.duet.alarm.action.DISMISS" />
+                <action android:name="com.duet.alarm.action.DISMISS_BOTH" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The ten-minute resync heartbeat. Device-direct-boot aware so it
+             keeps pulling a partner's new alarms after an overnight reboot,
+             before anyone has unlocked the phone: AuthStore lives in
+             device-protected storage precisely so this can work there. -->
+        <receiver
+            android:name=".SyncReceiver"
+            android:exported="false"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="com.duet.alarm.RESYNC" />
             </intent-filter>
         </receiver>
 

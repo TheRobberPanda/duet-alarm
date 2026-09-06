@@ -42,12 +42,23 @@ class AlarmEngine {
         'pairId': pairId,
       });
 
-  /// Lets a firing alarm report a ring session as the signed-in user, with no
-  /// Flutter engine running. Call with nulls on sign-out.
-  static Future<void> setAuthToken(String? accessToken, String? userId) =>
+  /// Lets the native side act as the signed-in user with no Flutter engine
+  /// running -- reporting a ring session (RingSync.kt) and, more importantly,
+  /// pulling a partner's new alarms (AlarmPull.kt). Call with nulls on
+  /// sign-out.
+  ///
+  /// [refreshToken] matters because access tokens last an hour and the native
+  /// puller runs all night. Without it every overnight pull would 401 and a
+  /// partner's alarm would never arrive.
+  static Future<void> setAuthToken(
+    String? accessToken,
+    String? userId, {
+    String? refreshToken,
+  }) =>
       _channel.invokeMethod('setAuthToken', {
         'accessToken': accessToken,
         'userId': userId,
+        'refreshToken': refreshToken,
       });
 
   /// The two ring colors, so the native ringing screen wears the same skins as
@@ -56,13 +67,18 @@ class AlarmEngine {
   static Future<void> setSkinColors(int mine, int partner) =>
       _channel.invokeMethod('setSkinColors', {'mine': mine, 'partner': partner});
 
-  /// The theme's background and the partner's display name -- the ringing
-  /// screen dresses in your theme's world and can say who woke up first when
-  /// a shared ring ends (ADR-016). Pushed alongside [setSkinColors]; the
-  /// name is null when solo or unpaired.
-  static Future<void> setCosmetics({String? partnerName, required int bgColor}) =>
+  /// The theme's background and both display names -- the ringing screen
+  /// dresses in your theme's world, puts a face on each half of the ring, and
+  /// can say who woke up first when a shared ring ends (ADR-016). Pushed
+  /// alongside [setSkinColors]; [partnerName] is null when solo or unpaired.
+  static Future<void> setCosmetics({
+    String? partnerName,
+    String? myName,
+    required int bgColor,
+  }) =>
       _channel.invokeMethod('setCosmetics', {
         'partnerName': partnerName,
+        'myName': myName,
         'bgColor': bgColor,
       });
 
@@ -96,6 +112,15 @@ class AlarmEngine {
   }
 
   static Future<void> reconcile() => _channel.invokeMethod('reconcile');
+
+  /// Asks the NATIVE puller to fetch the pair's alarms and arm them now,
+  /// rather than waiting for its ten-minute heartbeat.
+  ///
+  /// This is the same path that runs while the app is closed (SyncReceiver ->
+  /// AlarmPull), so triggering it here is how you find out whether that path
+  /// works without leaving the phone alone for ten minutes. It only ever arms,
+  /// never disarms -- Dart's reconcile stays authoritative.
+  static Future<void> pullAlarms() => _channel.invokeMethod('pullAlarms');
 
   static Future<AlarmHealth> health() async {
     final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>('health');

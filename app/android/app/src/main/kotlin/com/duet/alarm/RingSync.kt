@@ -93,6 +93,44 @@ object RingSync {
     }
 
     /**
+     * MY OWN participant row -- the other half of "dismiss for both", and the
+     * reason that feature did not work over the cloud path at all.
+     *
+     * `act_on_partner` sets the TARGET's row to dismissed. Their phone,
+     * however, only ever polled [fetchPartnerState] (`user_id=neq.$uid`), so
+     * nothing on it ever read the row that had just been changed on its
+     * behalf: the RPC succeeded, the database was correct, and the alarm kept
+     * ringing. Only the LAN datagram actually stopped anything, which meant
+     * the feature worked at home on the same wifi and silently did nothing
+     * anywhere else.
+     *
+     * Same shape and same silence as [fetchPartnerState]: null means "no row,
+     * no credentials, or the request failed", and the caller does nothing.
+     */
+    fun fetchMyState(
+        ctx: Context, alarmId: String, firedAtUtc: Long, pairId: String?, callback: (String?) -> Unit
+    ) {
+        if (pairId == null) return callback(null)
+        val token = AuthStore.accessToken(ctx)
+        val uid = AuthStore.userId(ctx)
+        if (token == null || uid == null) return callback(null)
+
+        Thread {
+            val state = try {
+                val session = sessionId(alarmId, firedAtUtc)
+                val url = "$URL_BASE/ring_participants" +
+                    "?session_id=eq.$session&user_id=eq.$uid&select=state&limit=1"
+                val arr = JSONArray(get(token, url))
+                if (arr.length() == 0) null else arr.getJSONObject(0).optString("state", null)
+            } catch (t: Throwable) {
+                Log.w(TAG, "fetch my state failed (non-fatal)", t)
+                null
+            }
+            callback(state)
+        }.start()
+    }
+
+    /**
      * "For both of us" (docs/01, ADR-006's deliberate secondary action): acts on
      * the PARTNER's participant row via the `act_on_partner` RPC, which is the
      * only path that can -- it checks their `allow_partner_dismiss` preference
@@ -156,6 +194,14 @@ object RingSync {
             }
         }.start()
     }
+
+    /**
+     * Shared with AlarmPull.kt, which needs the same authenticated GET and has
+     * no more business duplicating the header dance than it does the base URL.
+     * Returns "[]" rather than throwing on an HTTP error, so a caller with no
+     * UI has one thing to handle instead of two.
+     */
+    fun getJson(token: String, url: String): String = get(token, url)
 
     private fun get(token: String, url: String): String {
         val conn = URL(url).openConnection() as HttpURLConnection

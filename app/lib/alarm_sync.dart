@@ -27,7 +27,9 @@ class AlarmSync {
   /// clock that refuses to work offline is not an alarm clock.
   Future<SyncResult> sync(List<Alarm> local, {String? pairId}) async {
     final uid = _userId;
-    if (uid == null) return SyncResult(local, synced: false);
+    if (uid == null) {
+      return SyncResult(local, synced: false, detail: 'no signed-in user');
+    }
 
     try {
       final remoteRows = await _db.from('alarms').select();
@@ -103,11 +105,21 @@ class AlarmSync {
       // Tombstones stay on the server so the other device learns of the delete,
       // but they must not clutter this device's list.
       final visible = merged.values.where((a) => !a.isDeleted).toList();
-      return SyncResult(visible, synced: true, conflicts: conflicts);
+      return SyncResult(
+        visible,
+        synced: true,
+        conflicts: conflicts,
+        // Counts only, but enough to tell "the server sent nothing" apart from
+        // "the server sent it and we dropped it" -- the question that is
+        // otherwise unanswerable from a phone, and the one that matters when a
+        // partner's alarm does not arrive. Shown on the health screen.
+        detail: 'remote ${remote.length}, local ${localById.length}, '
+            'kept ${visible.length}, pushed ${toPush.length}',
+      );
     } catch (e) {
       // Deliberately swallowed: the caller carries on with local state. The
       // flag is what the UI uses to say "not synced" rather than pretending.
-      return SyncResult(local, synced: false, error: e.toString());
+      return SyncResult(local, synced: false, error: e.toString(), detail: 'threw');
     }
   }
 
@@ -193,12 +205,18 @@ class AlarmSync {
 }
 
 class SyncResult {
-  SyncResult(this.alarms, {required this.synced, this.conflicts = 0, this.error});
+  SyncResult(this.alarms,
+      {required this.synced, this.conflicts = 0, this.error, this.detail});
 
   final List<Alarm> alarms;
   final bool synced;
   final int conflicts;
   final String? error;
+
+  /// A short human summary of what this sync actually moved, shown on the
+  /// health screen so a sync that "succeeds" but brings back nothing is
+  /// visibly different from one that never ran.
+  final String? detail;
 }
 
 /// One round trip's worth of per-listener rows, split by whose they are.

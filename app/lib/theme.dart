@@ -179,12 +179,14 @@ class SkinBuilder extends StatelessWidget {
 }
 
 /// Pushes the current theme's world down to the native ringing screen -- its
-/// background and (when paired) the partner's display name for the farewell
-/// message. Call wherever skins are pushed: pair resolution and theme picks.
-/// One helper, so the two callers can never drift.
-Future<void> pushCosmetics({String? partnerName}) =>
+/// background and, when paired, both display names: the partner's for the
+/// farewell message, and yours for the avatar on your half of the ring. Call
+/// wherever skins are pushed: pair resolution and theme picks. One helper, so
+/// the callers can never drift.
+Future<void> pushCosmetics({String? partnerName, String? myName}) =>
     AlarmEngine.setCosmetics(
       partnerName: partnerName,
+      myName: myName,
       bgColor: SkinColors.instance.pal.bgDeep.toARGB32(),
     );
 
@@ -337,7 +339,14 @@ class _DuetButtonState extends State<DuetButton> {
                       size: 17,
                       color: widget.filled ? DuetColors.amberInk : SkinColors.instance.accent),
                   const SizedBox(width: 8),
-                  label,
+                  // Flexible, not bare: at a large system font scale an
+                  // icon-plus-label button is wider than the space it is given
+                  // and every one of them in the app overflowed. Shrinking the
+                  // label is the only graceful loser here -- the icon is 17dp
+                  // and the padding is what makes it a button.
+                  Flexible(
+                    child: FittedBox(fit: BoxFit.scaleDown, child: label),
+                  ),
                 ],
               );
 

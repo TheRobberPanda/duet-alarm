@@ -35,6 +35,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _repo = AlarmRepository.instance;
   Timer? _tick;
+  Timer? _syncTicker;
   bool _loading = true;
 
   // The rotating tip banner -- a game-loading-screen-style line that cycles on
@@ -77,11 +78,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // gets read; a carousel is a thing you learn to ignore.
       if (mounted) setState(() => _tipIndex++);
     });
+    // Pull while we are open.
+    //
+    // Before this, refresh() ran ONLY on launch and on foreground-resume, so an
+    // alarm your partner created never reached this phone's AlarmManager until
+    // somebody happened to open the app. That is exactly how a 13:36 alarm
+    // created at 13:23 failed to ring: the app had not been foregrounded in
+    // between, and the store held only the next two days' occurrences.
+    //
+    // The native SyncReceiver covers the app-closed case every ten minutes;
+    // this covers the app-open case in one, because watching the home screen
+    // and not seeing your partner's new alarm appear is its own kind of broken.
+    _syncTicker = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted) _load();
+    });
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _syncTicker?.cancel();
     _tipTicker?.cancel();
     _nameInput.dispose();
     WidgetsBinding.instance.removeObserver(this);

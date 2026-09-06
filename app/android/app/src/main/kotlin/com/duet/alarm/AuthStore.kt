@@ -9,18 +9,26 @@ import android.content.Context
  * Device-protected storage, like AlarmStore -- a phone that reboots overnight
  * has to be able to report a ring before it is ever unlocked.
  *
- * Deliberately just the access token, not the refresh token: this is a
- * best-effort, fire-and-forget feature (nothing about ringing depends on it,
- * per ADR-001), not something worth the complexity of a native refresh flow.
- * Dart pushes a fresh token down on every auth-state change and every app
- * foreground, which is the common case an alarm fires in reach of. A token
- * that goes stale during a long stretch with the app unopened just means that
- * one ring session silently does not get reported -- the alarm itself still
- * rings exactly as scheduled.
+ * This used to hold only the access token, on the reasoning that native
+ * networking was cosmetic -- a stale token just meant one ring session went
+ * unreported, and the alarm rang regardless (ADR-001).
+ *
+ * AlarmPull.kt changed that bargain. The native side is now how a partner's
+ * newly created alarm reaches this phone while the app is closed, and a
+ * Supabase access token lasts one hour. Overnight -- the exact stretch that
+ * matters -- the token is always expired, so a pull with no way to refresh
+ * would 401 in silence and the alarm would not ring. That is a missed alarm,
+ * not a missing nicety, so the refresh token lives here too and
+ * [refreshedAccessToken] mints a new one.
+ *
+ * ADR-001 still holds: none of this is what makes a phone ring. It is how the
+ * schedule gets delivered in advance, and a phone with no network keeps
+ * ringing everything it already holds.
  */
 object AuthStore {
     private const val PREFS = "duet_auth"
     private const val KEY_TOKEN = "access_token"
+    private const val KEY_REFRESH = "refresh_token"
     private const val KEY_USER = "user_id"
     private const val KEY_PAIR = "pair_id"
     private const val KEY_LAN_SECRET = "lan_secret"
@@ -28,16 +36,65 @@ object AuthStore {
     private const val KEY_SKIN_MINE = "skin_mine"
     private const val KEY_SKIN_PARTNER = "skin_partner"
     private const val KEY_PARTNER_NAME = "partner_name"
+    private const val KEY_MY_NAME = "my_name"
     private const val KEY_BG_COLOR = "bg_color"
 
     private fun prefs(ctx: Context) =
         ctx.deviceProtected().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun set(ctx: Context, accessToken: String?, userId: String?) {
+    fun set(ctx: Context, accessToken: String?, userId: String?, refreshToken: String? = null) {
         prefs(ctx).edit()
             .putString(KEY_TOKEN, accessToken)
             .putString(KEY_USER, userId)
-            .apply()
+            .putString(KEY_REFRESH, refreshToken)
+            // commit, not apply: a sign-out that is still in flight when the
+            // process dies would leave a live token on disk.
+            .commit()
+    }
+
+    fun refreshToken(ctx: Context): String? = prefs(ctx).getString(KEY_REFRESH, null)
+
+    /** Stores the pair Supabase handed back from a refresh, so the next wake
+     *  starts from the new one rather than refreshing every single time. */
+    fun updateTokens(ctx: Context, accessToken: String, refreshToken: String?) {
+        prefs(ctx).edit()
+            .putString(KEY_TOKEN, accessToken)
+            .apply { if (refreshToken != null) putString(KEY_REFRESH, refreshToken) }
+            .commit()
+    }
+
+    /**
+     * An access token good for at least another minute, refreshing it first if
+     * not. Returns null when there is nothing to work with -- signed out, or a
+     * refresh that failed -- which every caller treats as "do nothing".
+     *
+     * Blocking, and must be called off the main thread.
+     */
+    fun freshAccessToken(ctx: Context): String? {
+        val current = accessToken(ctx) ?: return null
+        if (!expiresWithin(current, seconds = 60)) return current
+
+        val refresh = refreshToken(ctx) ?: return current
+        val minted = SupabaseAuth.refresh(refresh) ?: return current
+        updateTokens(ctx, minted.first, minted.second)
+        return minted.first
+    }
+
+    /**
+     * Reads `exp` out of the JWT payload without verifying the signature --
+     * which is correct here: we are not authenticating anything, only asking
+     * "is it worth sending this?". A token we cannot parse is treated as
+     * expired, so the refresh path runs rather than a doomed request.
+     */
+    private fun expiresWithin(jwt: String, seconds: Long): Boolean = try {
+        val payload = jwt.split(".").getOrNull(1) ?: throw IllegalArgumentException("no payload")
+        val json = String(
+            android.util.Base64.decode(payload, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING)
+        )
+        val exp = org.json.JSONObject(json).getLong("exp")
+        exp * 1000L - System.currentTimeMillis() < seconds * 1000L
+    } catch (t: Throwable) {
+        true
     }
 
     /**
@@ -83,15 +140,19 @@ object AuthStore {
      * ringing screen dresses in the same world the app does. Both pushed from
      * Dart; 0 / null mean "never set" and the built-in defaults hold.
      */
-    fun setCosmetics(ctx: Context, partnerName: String?, bgColor: Int) {
+    fun setCosmetics(ctx: Context, partnerName: String?, myName: String?, bgColor: Int) {
         prefs(ctx).edit()
             .putString(KEY_PARTNER_NAME, partnerName)
+            .putString(KEY_MY_NAME, myName)
             .putInt(KEY_BG_COLOR, bgColor)
             .apply()
     }
 
     fun partnerName(ctx: Context): String? =
         prefs(ctx).getString(KEY_PARTNER_NAME, null)?.takeIf { it.isNotBlank() }
+
+    fun myName(ctx: Context): String? =
+        prefs(ctx).getString(KEY_MY_NAME, null)?.takeIf { it.isNotBlank() }
 
     fun bgColor(ctx: Context, fallback: Int): Int =
         prefs(ctx).getInt(KEY_BG_COLOR, 0).takeIf { it != 0 } ?: fallback

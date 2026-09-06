@@ -20,6 +20,10 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         // Anything armed before a reboot or an app update gets put back.
         AlarmScheduler.reconcile(this)
+        // Start (or restart) the resync heartbeat. Doing it here as well as at
+        // boot means a fresh install, a force-stop, or an OEM task-killer all
+        // get the heartbeat back the next time the app is opened.
+        SyncReceiver.schedule(this)
         requestNotificationPermission()
     }
 
@@ -102,7 +106,8 @@ class MainActivity : FlutterActivity() {
                         AuthStore.set(
                             this,
                             call.argument<String>("accessToken"),
-                            call.argument<String>("userId")
+                            call.argument<String>("userId"),
+                            call.argument<String>("refreshToken")
                         )
                         result.success(null)
                     }
@@ -125,6 +130,7 @@ class MainActivity : FlutterActivity() {
                         AuthStore.setCosmetics(
                             this,
                             call.argument<String>("partnerName"),
+                            call.argument<String>("myName"),
                             call.argument<Number>("bgColor")?.toInt() ?: 0
                         )
                         result.success(null)
@@ -139,6 +145,15 @@ class MainActivity : FlutterActivity() {
                             call.argument<String>("lanSecret"),
                             call.argument<Boolean>("allowPartnerDismiss") ?: true
                         )
+                        result.success(null)
+                    }
+
+                    // Dart asking the native puller to run right now. Used
+                    // after a local edit, so the partner's phone is not the
+                    // only one racing the ten-minute heartbeat.
+                    "pullAlarms" -> {
+                        AlarmPull.pull(this)
+                        SyncReceiver.schedule(this)
                         result.success(null)
                     }
 

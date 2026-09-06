@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alarm.dart';
@@ -34,6 +36,21 @@ class AlarmRepository {
   /// Whether the last sync attempt reached the server. Surfaced in the UI so a
   /// silent failure is never mistaken for "saved".
   bool lastSyncOk = true;
+
+  /// Why the last sync failed, or null if it did not.
+  ///
+  /// AlarmSync's own doc comment says "sync failing is a degraded state, never
+  /// a silent one" -- but until this field the only thing that escaped was a
+  /// bool, so a sync that had been failing for days looked exactly like being
+  /// offline for a second, and the reason was unrecoverable. The diagnostics
+  /// screen shows this verbatim.
+  String? lastSyncError;
+
+  /// What the last sync moved, or why it did not run at all. Never null after
+  /// the first refresh; 'sync source not wired' means the repository was never
+  /// handed an AlarmSync, which looks exactly like "nothing to do" from here
+  /// and is in fact the app being unable to see the server at all.
+  String lastSyncDetail = 'not attempted yet';
 
   List<Alarm> get alarms => List.unmodifiable(_alarms);
 
@@ -81,9 +98,18 @@ class AlarmRepository {
   Future<void> refresh() async {
     await load();
     final s = sync;
+    if (s == null) {
+      lastSyncOk = false;
+      lastSyncDetail = 'sync source not wired';
+    }
     if (s != null) {
       final result = await s.sync(_alarms, pairId: pairId);
       lastSyncOk = result.synced;
+      lastSyncError = result.error;
+      lastSyncDetail = result.detail ?? 'no detail';
+      if (!result.synced) {
+        debugPrint('Duet: alarm sync failed -- ${result.error}');
+      }
       if (result.synced) {
         _alarms = result.alarms;
         _sort();

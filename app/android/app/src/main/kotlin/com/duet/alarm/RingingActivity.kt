@@ -27,6 +27,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
@@ -47,6 +49,9 @@ private val MUTED = Color.parseColor("#CBA8BE")        // DuetColors.muted
 private val DIM = Color.parseColor("#937284")          // DuetColors.dim
 private val ON_ACCENT = Color.parseColor("#3D1526")    // DuetColors.amberInk
 
+private val DEFAULT_MINE = Color.parseColor("#C9AEE8")
+private val DEFAULT_THEM = Color.parseColor("#F0A8C8")
+
 /**
  * Deliberately NOT a Flutter screen.
  *
@@ -56,8 +61,26 @@ private val ON_ACCENT = Color.parseColor("#3D1526")    // DuetColors.amberInk
  * keeps working even if the Flutter side is broken entirely, and it can run
  * before first unlock (directBootAware) after an overnight reboot.
  * See docs/12-roadblocks.md section 3.2.
+ *
+ * ## The two phases
+ *
+ * RINGING is the alarm: sound, vibration, Snooze, Dismiss, and the held
+ * "for both of us".
+ *
+ * WATCHING is what happens after YOU dismiss and your partner has not. The
+ * screen stays, in silence -- the same view they are looking at, minus the
+ * noise -- with a "Good morning" coming out of your half of the ring. When
+ * they finally stop theirs, their half lights up, their own bubble appears,
+ * and only then does this go away. That waiting is the product: an alarm clock
+ * for two people is about the moment you both got up, and ending the screen
+ * the instant you personally hit Dismiss throws that away.
+ *
+ * Then it opens the app, not the lock screen, so the morning ends on the wake
+ * receipt rather than on a wallpaper.
  */
 class RingingActivity : Activity() {
+
+    private enum class Phase { RINGING, WATCHING }
 
     private var alarmId: String? = null
     private var snoozeMinutes = 9
@@ -66,6 +89,9 @@ class RingingActivity : Activity() {
     private var soundRef = "default"
     private var label = "Alarm"
     private var pairId: String? = null
+
+    private var phase = Phase.RINGING
+
     private var awarenessWrap: View? = null
     private lateinit var awarenessText: TextView
 
@@ -75,10 +101,23 @@ class RingingActivity : Activity() {
     private var lastPartnerState: String? = null
 
     private lateinit var rootLayout: LinearLayout
+    private lateinit var screen: FrameLayout
+    private lateinit var ring: PairRingView
+    private lateinit var myBubble: TextView
+    private lateinit var partnerBubble: TextView
+    private lateinit var controls: LinearLayout
+    private lateinit var hint: TextView
+    private var holdBoth: HoldButton? = null
+    private var partnerAvatar: View? = null
+
     private val farewellHandler = Handler(Looper.getMainLooper())
     private val pollHandler = Handler(Looper.getMainLooper())
 
     private val snoozesLeft get() = (maxSnoozes - snoozeCount).coerceAtLeast(0)
+
+    private val mineColor by lazy { AuthStore.skinMine(this, DEFAULT_MINE) }
+    private val themColor by lazy { AuthStore.skinPartner(this, DEFAULT_THEM) }
+    private val partnerName by lazy { AuthStore.partnerName(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,6 +133,14 @@ class RingingActivity : Activity() {
 
         setContentView(buildUi())
 
+        // AFTER setContentView, never before: window.insetsController reads
+        // through the decor view, which does not exist until there is content,
+        // and calling it in onCreate threw an NPE that took the whole alarm
+        // screen down with it. Wrapped as well as ordered -- nothing cosmetic
+        // on this screen is worth a crash, and a visible status bar is a much
+        // smaller problem than an alarm that does not appear.
+        runCatching { goFullscreen() }
+
         // If the user acts on the notification instead, this screen must go too.
         ContextCompat.registerReceiver(
             this, ringEnded, IntentFilter(AlarmActions.ACTION_RING_ENDED),
@@ -108,11 +155,46 @@ class RingingActivity : Activity() {
     }
 
     /**
+     * Edge to edge, with the system bars hidden.
+     *
+     * On a tall phone the alarm screen used to be letterboxed between a status
+     * bar and a gesture bar, which is both ugly and wrong: this is the one
+     * screen that should own the whole display. It also stops the clock in the
+     * status bar from sitting a few pixels above a much larger clock, which
+     * looked like a bug and occasionally disagreed by a minute.
+     *
+     * Swiping still reveals the bars transiently, so nothing is trapped.
+     */
+    private fun goFullscreen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+            window.decorView.windowInsetsController?.apply {
+                hide(WindowInsets.Type.systemBars())
+                systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        }
+    }
+
+    /**
      * Milestone 4's live awareness strip -- "Sam snoozed", "Sam is ringing too" --
      * polled rather than pushed: this screen has no Flutter engine and no
      * realtime channel, just RingSync's plain REST calls. A few seconds of
      * staleness on a strip that is itself a nice-to-have is a fine trade for not
      * building a socket connection into the one screen that must never hang.
+     *
+     * It also polls MY OWN row, which is what makes the partner's "dismiss for
+     * both" actually reach this phone when the two are not on the same wifi --
+     * see [RingSync.fetchMyState] for how that went unnoticed.
      */
     private fun startAwarenessPolling() {
         val id = alarmId ?: return
@@ -122,7 +204,14 @@ class RingingActivity : Activity() {
         val poll = object : Runnable {
             override fun run() {
                 RingSync.fetchPartnerState(this@RingingActivity, base, firedAt, pairId) { state ->
-                    runOnUiThread { showAwareness(state) }
+                    runOnUiThread { onPartnerState(state) }
+                }
+                if (phase == Phase.RINGING) {
+                    RingSync.fetchMyState(this@RingingActivity, base, firedAt, pairId) { mine ->
+                        if (mine == "dismissed") {
+                            runOnUiThread { dismissedByPartner() }
+                        }
+                    }
                 }
                 pollHandler.postDelayed(this, 4000)
             }
@@ -130,8 +219,29 @@ class RingingActivity : Activity() {
         pollHandler.post(poll)
     }
 
-    private fun showAwareness(state: String?) {
+    /** They pressed "for both of us" on their phone. Same effect as dismissing
+     *  here, so the two devices end in the same state, but the screen says who
+     *  did it rather than pretending you woke up on your own. */
+    private fun dismissedByPartner() {
+        if (phase != Phase.RINGING) return
+        alarmId?.let { AlarmActions.dismiss(this, it, pairId) }
+        enterWatching(greeting = partnerName?.let { "$it got us both up" } ?: "Alarm stopped")
+    }
+
+    private fun onPartnerState(state: String?) {
         lastPartnerState = state ?: lastPartnerState
+        showAwareness(state)
+
+        // The moment they stop theirs: their half of the ring lights up, they
+        // get a bubble of their own, and the morning is over for both of you.
+        if (state == "dismissed" && phase == Phase.WATCHING &&
+            partnerBubble.visibility != View.VISIBLE
+        ) {
+            celebratePartnerDismiss()
+        }
+    }
+
+    private fun showAwareness(state: String?) {
         val wrap = awarenessWrap ?: return
         val text = when (state) {
             "ringing" -> "They're ringing too"
@@ -159,35 +269,19 @@ class RingingActivity : Activity() {
         v?.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
-    /**
-     * "For both of us" -- ADR-006's deliberate secondary action, reached by a
-     * long press rather than a second button so it cannot be hit by accident.
-     * Stops your own alarm too: dismissing for both while yours kept ringing
-     * would be a confusing halfway state.
-     */
-    private fun dismissForBoth() {
-        val id = alarmId ?: return
-        val base = id.removePrefix(AlarmDef.SNOOZE_PREFIX)
-        val (alarm, firedAt) = splitFireId(base) ?: return dismiss()
-        vibrateConfirm()
-        // Both roads at once: the LAN datagram lands in milliseconds if they
-        // are on the same wifi, the RPC covers them being anywhere else.
-        // Whichever arrives first wins; the second is a harmless no-op.
-        LanSync.requestDismissForBoth(this, RingSync.sessionIdFor(alarm, firedAt))
-        RingSync.actOnPartner(this, alarm, firedAt, pairId, "dismiss") { }
-        dismiss()
-    }
-
-    /** A partner state message that came in over the LAN, relayed by
-     *  AlarmService -- the same strip the 4s poll drives, just instant. */
     private val partnerStateOverLan = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
-            showAwareness(i?.getStringExtra(LanSync.EXTRA_STATE))
+            onPartnerState(i?.getStringExtra(LanSync.EXTRA_STATE))
         }
     }
 
     private val ringEnded = object : BroadcastReceiver() {
-        override fun onReceive(c: Context?, i: Intent?) = finishRinging()
+        override fun onReceive(c: Context?, i: Intent?) {
+            // Only in RINGING. Once we are watching, the ring has already
+            // ended -- this broadcast is our own dismiss coming back to us,
+            // and obeying it would close the screen we deliberately kept.
+            if (phase == Phase.RINGING) finishRinging()
+        }
     }
 
     override fun onDestroy() {
@@ -216,32 +310,45 @@ class RingingActivity : Activity() {
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun dpf(v: Float) = v * resources.displayMetrics.density
+
+    /**
+     * The dial, sized to the phone rather than nailed to 268dp.
+     *
+     * A fixed size is a bug on both ends: on a small phone the ring crowded
+     * the buttons, and on a large one it sat marooned in the middle of a lot
+     * of empty space looking like a screenshot from a smaller device. Bounded
+     * by height as well as width so a short, wide screen does not push the
+     * controls off the bottom.
+     */
+    private fun dialSize(): Int {
+        val dm = resources.displayMetrics
+        val byWidth = dm.widthPixels * 0.70f
+        val byHeight = dm.heightPixels * 0.34f
+        return minOf(byWidth, byHeight).toInt().coerceIn(dp(190), dp(360))
+    }
 
     private fun buildUi(): View {
+        val bg = AuthStore.bgColor(this, BG_DEEP)
+
         rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             // Your theme's background, pushed down from Dart (AuthStore
             // setCosmetics). 06:00 should look like the app you went to bed with.
-            setBackgroundColor(AuthStore.bgColor(this@RingingActivity, BG_DEEP))
+            setBackgroundColor(bg)
             setPadding(dp(24), dp(40), dp(24), dp(28))
         }
 
+        val dialPx = dialSize()
+
         // ── The dial: two-tone ring with the time inside ──────────────────────
-        // Lavender is you, pink is your partner. Even alone, the ring is the app's
-        // signature mark and the thing that says "this is Duet, not a stock
-        // alarm" to someone squinting at 06:00.
+        // Left half is your partner, right half is you -- the same halves the
+        // Flutter PairRing draws, so the two screens agree about which side of
+        // the ring each of you is.
         val dial = FrameLayout(this)
-        dial.addView(
-            PairRingView(
-                this,
-                // Whatever skins the two of you picked, pushed down from Dart
-                // (AuthStore.setSkinColors). Falls back to the classic pair.
-                mineColor = AuthStore.skinMine(this, Color.parseColor("#C9AEE8")),
-                themColor = AuthStore.skinPartner(this, Color.parseColor("#F0A8C8")),
-            ),
-            FrameLayout.LayoutParams(dp(268), dp(268), Gravity.CENTER)
-        )
+        ring = PairRingView(this, mineColor = mineColor, themColor = themColor)
+        dial.addView(ring, FrameLayout.LayoutParams(dialPx, dialPx, Gravity.CENTER))
 
         val inner = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -257,7 +364,8 @@ class RingingActivity : Activity() {
         inner.addView(TextView(this).apply {
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             setTextColor(TEXT)
-            textSize = 58f
+            // Scaled with the dial for the same reason the dial is scaled.
+            textSize = dialPx / resources.displayMetrics.density * 0.216f
             // The same display face the Flutter dial uses. It ships inside the
             // APK's flutter_assets even when no engine ever runs, but the path
             // is not something this screen may ever crash over -- any failure
@@ -270,35 +378,82 @@ class RingingActivity : Activity() {
             }.getOrDefault(Typeface.create("sans-serif-light", Typeface.NORMAL))
             letterSpacing = 0.02f
             gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-            topMargin = dp(6)
-        })
+        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(6) })
         inner.addView(TextView(this).apply {
-            text = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
+            text = SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(Date())
             setTextColor(MUTED)
             textSize = 13f
             gravity = Gravity.CENTER
+            // One line, always. Inside a dial there is no room to wrap, and a
+            // date that silently loses its second half is worse than a short
+            // month name.
+            isSingleLine = true
         })
-        dial.addView(
-            inner,
-            FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER)
+        dial.addView(inner, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER))
+
+        // ── The two faces, one per half ──────────────────────────────────────
+        // Partner on the LEFT, over their arc; you on the right, over yours.
+        // Without these the ring is two anonymous colours and you have to
+        // remember which one you are.
+        val avatarPx = (dialPx * 0.20f).toInt()
+        val avatarInset = (dialPx * 0.04f).toInt()
+
+        partnerName?.let { name ->
+            partnerAvatar = AvatarView(this, name.take(1).uppercase(), themColor, ON_ACCENT).also {
+                dial.addView(
+                    it,
+                    FrameLayout.LayoutParams(avatarPx, avatarPx, Gravity.START or Gravity.CENTER_VERTICAL)
+                        .apply { marginStart = avatarInset }
+                )
+            }
+        }
+        val myInitial = AuthStore.myName(this)?.take(1)?.uppercase()
+        if (partnerName != null) {
+            dial.addView(
+                AvatarView(this, myInitial ?: "♥", mineColor, ON_ACCENT),
+                FrameLayout.LayoutParams(avatarPx, avatarPx, Gravity.END or Gravity.CENTER_VERTICAL)
+                    .apply { marginEnd = avatarInset }
+            )
+        }
+
+        // ── The bubbles ──────────────────────────────────────────────────────
+        // One per half, each with its tail under its own side, so a greeting
+        // visibly comes out of that person's arc. Invisible until spoken.
+        val density = resources.displayMetrics.density
+        partnerBubble = speechBubble(this, tailOnLeft = true, accent = themColor,
+            surface = SURFACE, textColor = TEXT, density = density)
+        myBubble = speechBubble(this, tailOnLeft = false, accent = mineColor,
+            surface = SURFACE, textColor = TEXT, density = density)
+
+        val bubbleRow = FrameLayout(this)
+        bubbleRow.addView(
+            partnerBubble,
+            FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.START or Gravity.BOTTOM)
+        )
+        bubbleRow.addView(
+            myBubble,
+            FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.END or Gravity.BOTTOM)
         )
 
         rootLayout.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
-        rootLayout.addView(dial, LinearLayout.LayoutParams(dp(268), dp(268)))
+        rootLayout.addView(
+            bubbleRow,
+            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(6) }
+        )
+        rootLayout.addView(dial, LinearLayout.LayoutParams(MATCH_PARENT, dialPx))
 
         // Milestone 4's live awareness strip, dressed as the canvas's glassy
         // pill instead of bare text. Empty and GONE until polling finds a
         // partner row to report -- see startAwarenessPolling().
         awarenessText = TextView(this).apply {
-            setTextColor(AuthStore.skinPartner(this@RingingActivity, Color.parseColor("#F0A8C8")))
+            setTextColor(themColor)
             textSize = 13.5f
             gravity = Gravity.CENTER
         }
         awarenessWrap = LinearLayout(this).apply {
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(19).toFloat()
+                cornerRadius = dpf(19f)
                 setColor(ColorUtils.setAlphaComponent(SURFACE, 200))
                 setStroke(dp(1), LINE)
             }
@@ -306,60 +461,80 @@ class RingingActivity : Activity() {
             addView(awarenessText)
             visibility = View.GONE
         }
-        rootLayout.addView(awarenessWrap, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-            topMargin = dp(18)
-        })
+        rootLayout.addView(
+            awarenessWrap,
+            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(18) }
+        )
 
         rootLayout.addView(View(this), LinearLayout.LayoutParams(MATCH_PARENT, 0).apply { weight = 1f })
 
         // ── Controls ─────────────────────────────────────────────────────────
-        // These stop YOUR phone only. The "for both of us" variants belong here
-        // too (docs/01) -- reached by a LONG PRESS on Dismiss rather than a
-        // second button, so it cannot be hit by accident (ADR-006).
-        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        buildRingingControls()
+        rootLayout.addView(controls, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
+        hint = TextView(this).apply {
+            text = hintText()
+            setTextColor(DIM)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(dp(20), dp(14), dp(20), 0)
+        }
+        rootLayout.addView(hint)
+
+        // The whole thing lives inside a FrameLayout so celebrations can be
+        // laid over it without disturbing the layout underneath.
+        screen = FrameLayout(this).apply {
+            setBackgroundColor(bg)
+            addView(rootLayout, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        }
+        return screen
+    }
+
+    private fun hintText(): String = when {
+        maxSnoozes == 0 -> "Snooze is off for this alarm"
+        snoozesLeft == 0 -> "No snoozes left — time to get up"
+        snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
+        else -> "Snooze lasts $snoozeMinutes min"
+    }
+
+    private fun buildRingingControls() {
+        controls.removeAllViews()
+
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         if (snoozesLeft > 0) {
-            controls.addView(
+            row.addView(
                 actionButton("Snooze", SURFACE, TEXT, outlined = true) { snooze() },
                 LinearLayout.LayoutParams(0, dp(72)).apply { weight = 1f; rightMargin = dp(6) }
             )
         }
-        controls.addView(
-            actionButton(
-                "Dismiss",
-                AuthStore.skinMine(this, Color.parseColor("#F0A8C8")),
-                ON_ACCENT,
-                outlined = false
-            ) { dismiss() }
-                .apply {
-                    if (pairId != null) {
-                        setOnLongClickListener { dismissForBoth(); true }
-                    }
-                },
+        row.addView(
+            actionButton("Dismiss", mineColor, ON_ACCENT, outlined = false) { dismiss() },
             LinearLayout.LayoutParams(0, dp(72)).apply {
                 weight = 1f
                 if (snoozesLeft > 0) leftMargin = dp(6)
             }
         )
-        rootLayout.addView(controls, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        controls.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
-        rootLayout.addView(TextView(this).apply {
-            text = listOfNotNull(
-                when {
-                    maxSnoozes == 0 -> "Snooze is off for this alarm"
-                    snoozesLeft == 0 -> "No snoozes left — time to get up"
-                    snoozeCount > 0 -> "Snooze $snoozeCount of $maxSnoozes · $snoozeMinutes min"
-                    else -> "Snooze lasts $snoozeMinutes min"
-                },
-                "hold Dismiss to end it for both".takeIf { pairId != null },
-            ).joinToString(" · ")
-            setTextColor(DIM)
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(dp(20), dp(14), dp(20), 0)
-        })
-
-        return rootLayout
+        // "For both of us" as its own visible button, held rather than tapped.
+        // It used to be an invisible long-press on Dismiss, which nobody could
+        // find; the hold is still what keeps it from being hit by accident.
+        if (pairId != null) {
+            holdBoth = HoldButton(
+                context = this,
+                label = "Hold to dismiss for both",
+                holdMs = 1100L,
+                fillColor = ColorUtils.setAlphaComponent(themColor, 190),
+                trackColor = ColorUtils.setAlphaComponent(SURFACE, 220),
+                lineColor = ColorUtils.setAlphaComponent(themColor, 130),
+                textColor = TEXT,
+            ) { dismissForBoth() }
+            controls.addView(
+                holdBoth,
+                LinearLayout.LayoutParams(MATCH_PARENT, dp(60)).apply { topMargin = dp(10) }
+            )
+        }
     }
 
     private fun actionButton(
@@ -371,7 +546,7 @@ class RingingActivity : Activity() {
         letterSpacing = 0.02f
         setTextColor(fg)
         background = GradientDrawable().apply {
-            cornerRadius = dp(24).toFloat()
+            cornerRadius = dpf(24f)
             setColor(bg)
             if (outlined) setStroke(dp(1), LINE)
         }
@@ -394,133 +569,129 @@ class RingingActivity : Activity() {
             snoozeCount = snoozeCount,
             pairId = pairId
         )
+        // A snooze is not a morning. No farewell, no bubble, no receipt.
         finishRinging()
     }
 
     private fun dismiss() {
         alarmId?.let { AlarmActions.dismiss(this, it, pairId) }
-        // Snooze and dismiss both stop the ring, but only a DISMISS earns the
-        // farewell: the little "you're up" moment needs to feel earned, and a
-        // snooze that celebrated would be lying.
-        showFarewell()
+        enterWatching(greeting = "Good morning")
+    }
+
+    private fun dismissForBoth() {
+        val id = alarmId ?: return
+        vibrateConfirm()
+        AlarmActions.dismissForBoth(this, id, pairId)
+        enterWatching(greeting = "Good morning")
     }
 
     /**
-     * The farewell: a beat of celebration between "you stopped the alarm" and
-     * the screen going away. A check that pops in, a few hearts floating up,
-     * and -- when the partner poll knows something for sure -- who woke
-     * first. An uncertain state says nothing rather than a wrong name; a solo
-     * ring gets the animation alone.
+     * You are up; the alarm is silent; the screen stays.
+     *
+     * Everything noisy has already stopped -- AlarmActions.dismiss killed the
+     * service, which owns the audio and the vibration -- so this is only about
+     * what is left on screen. It becomes, deliberately, the view your partner
+     * still has: the same ring, without the racket. Then it waits for them.
+     *
+     * Solo rings do not wait for anybody, so they go straight on.
      */
-    private fun showFarewell() {
-        val partner = AuthStore.partnerName(this)
-        val message = when {
-            partner == null -> null // solo: the animation speaks for itself
-            lastPartnerState == "dismissed" -> "$partner beat you to it"
-            lastPartnerState == null -> null // poll found no row yet: no claim
-            else -> "You woke up before $partner" // ringing, snoozed, missed
+    private fun enterWatching(greeting: String) {
+        if (phase == Phase.WATCHING) return
+        phase = Phase.WATCHING
+
+        // Your half completes, and says good morning out of your own side.
+        ring.markMineDone()
+        myBubble.post { myBubble.speak(greeting, fromLeft = false) }
+        floatHearts(screen, mineColor, themColor, resources.displayMetrics.density)
+
+        // Let the display time out normally now. Holding the screen awake was
+        // for the alarm; the aftermath does not need to burn the battery if
+        // the phone goes back on the nightstand.
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        val partner = partnerName
+        if (partner == null || pairId == null) {
+            // Nobody to wait for.
+            controls.removeAllViews()
+            hint.text = ""
+            farewellHandler.postDelayed({ openWakeReceipt() }, 1600)
+            return
         }
 
-        val mine = AuthStore.skinMine(this, Color.parseColor("#C9AEE8"))
-        val them = AuthStore.skinPartner(this, Color.parseColor("#F0A8C8"))
-
-        val overlay = FrameLayout(this).apply {
-            setBackgroundColor(AuthStore.bgColor(this@RingingActivity, BG_DEEP))
-            isClickable = true // swallow touches; nothing behind it is reachable now
+        // Already up before you got here: no waiting, just both bubbles.
+        if (lastPartnerState == "dismissed") {
+            showWaitingControls("$partner beat you to it")
+            farewellHandler.postDelayed({ celebratePartnerDismiss() }, 500)
+            return
         }
 
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-        }
-
-        // The check, drawn as a filled circle in your color, popping in.
-        val check = TextView(this).apply {
-            text = "✓"
-            textSize = 44f
-            setTextColor(ON_ACCENT)
-            gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                colors = intArrayOf(mine, them)
-                orientation = GradientDrawable.Orientation.TL_BR
-            }
-        }
-        val checkSize = dp(96)
-        column.addView(check, LinearLayout.LayoutParams(checkSize, checkSize).apply { gravity = Gravity.CENTER_HORIZONTAL })
-
-        if (message != null) {
-            column.addView(TextView(this).apply {
-                text = message
-                setTextColor(TEXT)
-                textSize = 17f
-                letterSpacing = 0.02f
-                gravity = Gravity.CENTER
-                setPadding(0, dp(22), 0, 0)
-            }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        }
-
-        overlay.addView(column, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER))
-
-        // Hearts: your color and theirs floating up from random points along
-        // the bottom -- the two of you, rising. Cheap Views, one animator.
-        for (i in 0 until 7) {
-            val heart = TextView(this).apply {
-                text = "♥"
-                textSize = (14 + (i % 3) * 8).toFloat()
-                setTextColor(if (i % 2 == 0) mine else them)
-                alpha = 0f
-                x = resources.displayMetrics.widthPixels * (0.12f + 0.12f * i)
-            }
-            overlay.addView(heart, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM))
-            val rise = ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 1200
-                startDelay = (80 * i).toLong()
-                interpolator = AccelerateDecelerateInterpolator()
-                addUpdateListener {
-                    val t = it.animatedValue as Float
-                    heart.translationY = -t * dp(300)
-                    heart.alpha = if (t < 0.15f) t / 0.15f else 1f - (t - 0.15f) / 0.85f
-                }
-            }
-            rise.start()
-        }
-
-        rootLayout.addView(overlay, LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-
-        // Check pops in with a little overshoot -- small enough to stay
-        // gentle, big enough to feel like a bell being struck.
-        check.scaleX = 0f
-        check.scaleY = 0f
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 420
-            interpolator = android.view.animation.OvershootInterpolator(1.6f)
-            addUpdateListener {
-                val s = it.animatedValue as Float
-                check.scaleX = s
-                check.scaleY = s
-            }
-            start()
-        }
-
-        // One beat and a half, then gone. No transition -- same rule as ever.
-        farewellHandler.postDelayed({ finishRinging() }, 1500)
+        showWaitingControls("Waiting for $partner")
     }
 
-    /** Back to rest. If the phone was locked when the alarm rang and STILL is
-     *  -- you dismissed from bed without ever unlocking -- the least
-     *  surprising thing is for the screen to go back to sleep, not to sit on
-     *  the lockscreen glowing. Android has no public "re-lock and sleep" for
-     *  a non-admin app, but clearing the keep-screen-on flags before
-     *  finishing hands the display back to the system's own screen timeout.
-     *  A phone that was unlocked before the ring is left exactly as it was.
+    private fun showWaitingControls(message: String) {
+        controls.removeAllViews()
+        controls.addView(
+            actionButton("Done", SURFACE, TEXT, outlined = true) { openWakeReceipt() },
+            LinearLayout.LayoutParams(MATCH_PARENT, dp(60))
+        )
+        hint.text = message
+    }
+
+    /**
+     * They stopped theirs. Their half of the ring completes, their bubble
+     * answers yours, and after a beat the morning moves to the wake receipt.
      */
+    private fun celebratePartnerDismiss() {
+        if (partnerBubble.visibility == View.VISIBLE) return
+        ring.markThemDone()
+        val name = partnerName
+        partnerBubble.post {
+            partnerBubble.speak("Good morning", fromLeft = true)
+        }
+        floatHearts(screen, mineColor, themColor, resources.displayMetrics.density, count = 9)
+        hint.text = name?.let { "$it is up too" } ?: "You're both up"
+        farewellHandler.removeCallbacksAndMessages(null)
+        farewellHandler.postDelayed({ openWakeReceipt() }, 2600)
+    }
+
+    /**
+     * The morning ends in the app, not on the lock screen.
+     *
+     * The home screen fetches the latest ring session on load and shows the
+     * wake receipt for one it has not shown before, so simply opening
+     * MainActivity is what puts the receipt in front of you -- there is no
+     * extra flag to pass, and a session with nothing to report just lands on
+     * the home screen instead of a wallpaper. FLAG_ACTIVITY_NEW_TASK because
+     * this activity lives in its own task affinity (see the manifest).
+     */
+    private fun openWakeReceipt() {
+        farewellHandler.removeCallbacksAndMessages(null)
+        runCatching {
+            startActivity(
+                Intent(this, MainActivity::class.java).addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
+            )
+        }
+        finish()
+        overridePendingTransition(0, 0)
+    }
+
+    /** Back to rest without opening anything -- the snooze path, and the path
+     *  taken when the ring was ended somewhere else entirely. If the phone was
+     *  locked when the alarm rang and STILL is, the least surprising thing is
+     *  for the screen to go back to sleep rather than sit on the lock screen
+     *  glowing. Android has no public "re-lock and sleep" for a non-admin app,
+     *  but clearing the keep-screen-on flag before finishing hands the display
+     *  back to the system's own timeout. */
     private fun returnToRest() {
         val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         if (km.isKeyguardLocked) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            setShowWhenLocked(false)
-            setTurnScreenOn(false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(false)
+                setTurnScreenOn(false)
+            }
         }
     }
 
@@ -531,18 +702,25 @@ class RingingActivity : Activity() {
         overridePendingTransition(0, 0)
     }
 
-    /** Back must not silently kill the alarm. */
-    override fun onBackPressed() { /* intentionally ignored */ }
+    /** Back must not silently kill the alarm. Once you are up and only
+     *  watching, though, it is just a screen -- let it close. */
+    @Deprecated("Deprecated in Activity")
+    override fun onBackPressed() {
+        if (phase == Phase.WATCHING) openWakeReceipt()
+    }
 }
 
 /**
  * The two-tone ring, drawn rather than bundled so it scales to any density and
- * needs no asset. Right half lavender (you), left half pink (them).
+ * needs no asset. Left half is your partner, right half is you.
  *
  * Mirrors the Flutter PairRing's canvas behaviour: a slow scale-plus-opacity
  * breathe (the canvas's ringBreathe keyframe) and a soft radial halo of the
  * two skin colours standing behind the dial. All of it is a couple of Paints
  * and one animator -- nothing here can fail in a way that stops the alarm.
+ *
+ * Either half can be marked "done", which brightens it, thickens it and gives
+ * it one bloom outward: the visual half of "that person is up".
  */
 private class PairRingView(
     context: Context,
@@ -563,9 +741,20 @@ private class PairRingView(
         strokeCap = Paint.Cap.ROUND
         color = themColor
     }
+    private val bloom = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
 
     private val youHalo = Paint(Paint.ANTI_ALIAS_FLAG)
     private val themHalo = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private var mineDone = false
+    private var themDone = false
+
+    /** 0 when idle, 0..1 while a half is blooming. */
+    private var mineBloom = 0f
+    private var themBloom = 0f
 
     // Shaders are rebuilt only when the view changes size -- allocating two
     // RadialGradients per frame was pure waste on a screen that redraws at
@@ -592,7 +781,28 @@ private class PairRingView(
         super.onDetachedFromWindow()
     }
 
-    private fun haloPaint(paint: Paint, color: Int, cx: Float, cy: Float, radius: Float) {
+    fun markMineDone() {
+        if (mineDone) return
+        mineDone = true
+        bloomAnimator { mineBloom = it }
+    }
+
+    fun markThemDone() {
+        if (themDone) return
+        themDone = true
+        bloomAnimator { themBloom = it }
+    }
+
+    private fun bloomAnimator(set: (Float) -> Unit) {
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 900
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { set(it.animatedValue as Float); invalidate() }
+            start()
+        }
+    }
+
+    private fun haloPaint(paint: Paint) {
         if (shaderWidth != width) {
             shaderWidth = width
             val r = width / 2f
@@ -617,10 +827,11 @@ private class PairRingView(
         val t = if (breathe.isRunning) breathe.animatedValue as Float else 0f
         val stroke = width * 0.011f
         track.strokeWidth = stroke
-        you.strokeWidth = stroke * 1.6f
-        them.strokeWidth = stroke * 1.6f
+        // A finished half sits a little heavier than a still-ringing one.
+        you.strokeWidth = stroke * if (mineDone) 2.2f else 1.6f
+        them.strokeWidth = stroke * if (themDone) 2.2f else 1.6f
 
-        val pad = stroke * 2f
+        val pad = stroke * 3f
         val rect = RectF(pad, pad, width - pad, height - pad)
         val cx = width / 2f
         val cy = height / 2f
@@ -629,23 +840,42 @@ private class PairRingView(
         // light standing behind the dial, the same trick the Flutter side's
         // HaloGlow does.
         val haloRadius = width / 2f
-        haloPaint(youHalo, you.color, cx, cy, haloRadius)
+        haloPaint(youHalo)
         themHalo.alpha = (115 + 65 * t).toInt()
         youHalo.alpha = (140 + 80 * t).toInt()
         canvas.drawCircle(cx + haloRadius * 0.22f, cy - haloRadius * 0.18f, haloRadius, youHalo)
         canvas.drawCircle(cx - haloRadius * 0.24f, cy + haloRadius * 0.20f, haloRadius, themHalo)
 
         // Breathe: scale the ring about its centre and let the arcs' opacity
-        // ride with the same value.
+        // ride with the same value. A finished half stops breathing and simply
+        // stays lit -- it is done, and done things do not pulse.
         val alpha = 0.82f + 0.18f * t
-        you.alpha = (alpha * 255).toInt()
-        them.alpha = (alpha * 255).toInt()
+        you.alpha = (if (mineDone) 1f else alpha).times(255).toInt()
+        them.alpha = (if (themDone) 1f else alpha).times(255).toInt()
         val scale = 1f + 0.035f * t
         canvas.save()
         canvas.scale(scale, scale, cx, cy)
         canvas.drawArc(rect, 0f, 360f, false, track)
         canvas.drawArc(rect, -90f, 180f, false, you)
         canvas.drawArc(rect, 90f, 180f, false, them)
+        canvas.restore()
+
+        // The bloom: one expanding, fading echo of the half that just finished.
+        drawBloom(canvas, rect, cx, cy, mineBloom, you.color, -90f)
+        drawBloom(canvas, rect, cx, cy, themBloom, them.color, 90f)
+    }
+
+    private fun drawBloom(
+        canvas: Canvas, rect: RectF, cx: Float, cy: Float,
+        progress: Float, color: Int, startAngle: Float
+    ) {
+        if (progress <= 0f || progress >= 1f) return
+        bloom.color = color
+        bloom.alpha = ((1f - progress) * 190).toInt()
+        bloom.strokeWidth = width * 0.011f * (1.6f + 2.4f * progress)
+        canvas.save()
+        canvas.scale(1f + 0.16f * progress, 1f + 0.16f * progress, cx, cy)
+        canvas.drawArc(rect, startAngle, 180f, false, bloom)
         canvas.restore()
     }
 }

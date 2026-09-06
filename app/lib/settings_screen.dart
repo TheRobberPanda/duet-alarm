@@ -121,7 +121,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SkinColors.instance.mine.toARGB32(),
         SkinColors.instance.partner.toARGB32(),
       );
-      pushCosmetics(partnerName: _pair?.partner?.shortName);
+      pushCosmetics(
+        partnerName: _pair?.partner?.shortName,
+        myName: _profile?.shortName,
+      );
       _accentWrite = _accentWrite.then((_) async {
         if (seq != _accentSeq || !mounted) return; // superseded while queued
         await _repo.updateAccent(skinId);

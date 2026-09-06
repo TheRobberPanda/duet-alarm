@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alarm.dart';
 import 'alarm_engine.dart';
@@ -36,6 +37,16 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
 
   bool get _isNew => widget.alarm == null;
 
+  /// The one-time nudge that the big time is itself a button.
+  ///
+  /// The steppers are right underneath it and look like the control, so people
+  /// nudge 07:00 to 06:30 one minute at a time and never discover the dial.
+  /// Shown on a new alarm until the dial has been opened once, then never
+  /// again -- a coach mark that keeps appearing after you have learned the
+  /// thing is just furniture.
+  bool _showTimeHint = false;
+  static const _hintSeenKey = 'seen_time_dial_hint';
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +61,19 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
     _target = a?.ringTarget ?? RingTarget.both;
     _label = TextEditingController(text: a?.label ?? '');
     _resolveSoundTitle();
+    if (_isNew) _maybeShowTimeHint();
+  }
+
+  Future<void> _maybeShowTimeHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted || prefs.getBool(_hintSeenKey) == true) return;
+    setState(() => _showTimeHint = true);
+  }
+
+  Future<void> _retireTimeHint() async {
+    if (_showTimeHint && mounted) setState(() => _showTimeHint = false);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hintSeenKey, true);
   }
 
   @override
@@ -83,6 +107,10 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
   void _bumpMinute(int delta) => setState(() => _minute = (_minute + delta + 60) % 60);
 
   Future<void> _openClock() async {
+    // Opening the dial IS learning it -- retire the hint whether or not a time
+    // is actually picked.
+    await _retireTimeHint();
+    if (!mounted) return;
     final picked = await showDuetClockPicker(
       context,
       hour: _hour,
@@ -189,6 +217,8 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
 
           Column(
             children: [
+              // The nudge, immediately above the time it points at.
+              _timeHint(),
               // The time itself opens the clock dial -- the steppers are for
               // nudging, the dial is for seeing.
               InkWell(
@@ -359,6 +389,41 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
 
   /// Chevron pair + value for one segment of the hero time. Wrapping is
   /// handled by the bump functions above.
+  /// "Tap the time" with an arrow bending down into it.
+  ///
+  /// Bobs gently rather than sitting still: a static label next to a very
+  /// large number is read as a caption, not as an instruction.
+  Widget _timeHint() => AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+        child: !_showTimeHint
+            ? const SizedBox(width: double.infinity)
+            : Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: _Bob(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Tap the time to set it on the dial',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: SkinColors.instance.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Transform.rotate(
+                        angle: math.pi / 2,
+                        child: Icon(Icons.subdirectory_arrow_left_rounded,
+                            size: 20, color: SkinColors.instance.accent),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      );
+
   Widget _timeSteppers() => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -725,4 +790,38 @@ class _WhoRingsPainter extends CustomPainter {
       old.mine != mine ||
       old.partner != partner ||
       old.line != line;
+}
+
+/// A slow vertical bob. Used by the time hint so the arrow reads as pointing
+/// at something rather than as decoration sitting above it.
+class _Bob extends StatefulWidget {
+  const _Bob({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Bob> createState() => _BobState();
+}
+
+class _BobState extends State<_Bob> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, Curves.easeInOut.transform(_c.value) * 4 - 2),
+          child: child,
+        ),
+        child: widget.child,
+      );
 }

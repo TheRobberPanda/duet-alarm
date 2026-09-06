@@ -27,8 +27,24 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     _refresh();
   }
 
+  /// The native puller, on demand. The two-second wait is the request itself:
+  /// AlarmPull hands off to a background thread and returns immediately, so
+  /// re-reading the armed count any sooner just shows the old one.
+  Future<void> _pullNow() async {
+    await AlarmEngine.pullAlarms();
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    await _refresh();
+    if (!mounted) return;
+    showDuetSnackBar(context, 'Pulled. $_armedCount fire times armed.',
+        icon: Icons.cloud_done_outlined);
+  }
+
   Future<void> _refresh() async {
-    await AlarmRepository.instance.reconcile();
+    // refresh(), not reconcile(): this screen's whole job is to report on the
+    // sync, and reconcile() never touches it -- so the numbers below used to
+    // describe whatever the home screen last did, which is not evidence.
+    await AlarmRepository.instance.refresh();
     final health = await AlarmEngine.health();
     final armed = await AlarmEngine.armedAlarms();
     if (mounted) {
@@ -38,9 +54,16 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
 
   Future<void> _testIn(Duration d) async {
     await AlarmEngine.arm(
-      id: 'test-${DateTime.now().millisecondsSinceEpoch}',
+      // The fired-id shape a real alarm has, '<id>#<instant>', not a bare one.
+      // The ringing screen splits on '#' to derive the ring session, so a test
+      // without it silently exercised none of the partner code -- no avatars,
+      // no awareness strip, no dismiss-for-both. A test alarm that skips the
+      // half of the screen most likely to break is not a test.
+      id: 'test-${DateTime.now().millisecondsSinceEpoch}'
+          '#${DateTime.now().add(d).millisecondsSinceEpoch}',
       fireAt: DateTime.now().add(d),
       label: 'Test alarm',
+      pairId: AlarmRepository.instance.pairId,
     );
     await _refresh();
     if (mounted) {
@@ -195,6 +218,12 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   child: DuetButton('In 2 minutes',
                       onTap: () => _testIn(const Duration(minutes: 2)))),
             ]),
+            const SizedBox(height: 8),
+            // Runs the same native path that runs while the app is closed, so
+            // "did my partner's new alarm actually reach this phone?" is a
+            // question you can answer in a second instead of in ten minutes.
+            DuetButton('Pull my partner\'s alarms now',
+                icon: Icons.cloud_download_outlined, onTap: _pullNow),
 
             const SizedBox(height: 26),
             const SectionLabel('Evidence'),
@@ -203,6 +232,17 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _evidence('Fire times currently held by the system',
                     '$_armedCount armed'),
+                const SizedBox(height: 14),
+                // The reason, not just the red badge. A sync that has been
+                // failing for days used to look identical to being offline for
+                // a second, which is how a partner's alarms can quietly stop
+                // arriving without anyone finding out.
+                _evidence(
+                    'Last sync with your partner',
+                    AlarmRepository.instance.lastSyncOk
+                        ? 'ok — ${AlarmRepository.instance.lastSyncDetail}'
+                        : 'FAILING (${AlarmRepository.instance.lastSyncDetail}) '
+                            '— ${AlarmRepository.instance.lastSyncError ?? 'no error reported'}'),
                 const SizedBox(height: 14),
                 _evidence('Last re-arm after restart or update',
                     (h?.lastBootReArm.isNotEmpty ?? false)

@@ -44,11 +44,13 @@ Future<void> main() async {
     AlarmEngine.setAuthToken(
       client.auth.currentSession?.accessToken,
       client.auth.currentUser?.id,
+      refreshToken: client.auth.currentSession?.refreshToken,
     );
     client.auth.onAuthStateChange.listen((state) {
       AlarmEngine.setAuthToken(
         state.session?.accessToken,
         state.session?.user.id,
+        refreshToken: state.session?.refreshToken,
       );
     });
   }
@@ -148,7 +150,10 @@ class _PairGateState extends State<PairGate> {
         );
         // And the ringing screen gets the theme's world plus the partner's
         // name -- it has no Flutter engine to read them from.
-        await pushCosmetics(partnerName: pair?.partner?.shortName);
+        await pushCosmetics(
+          partnerName: pair?.partner?.shortName,
+          myName: me?.shortName,
+        );
         // The native side also gets what the LAN fast path needs to sign and
         // authorise datagrams while the app itself is not running.
         await AlarmEngine.setPairContext(

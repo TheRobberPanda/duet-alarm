@@ -71,6 +71,34 @@ object AlarmActions {
         endRing(ctx)
     }
 
+    /**
+     * "For both of us" -- stops this phone AND asks the partner's to stop.
+     *
+     * Lives here, next to [dismiss], for the reason at the top of this file:
+     * the ringing screen and the notification both offer it now, and a
+     * "dismiss for both" that only half-worked from one of them is exactly the
+     * bug this object exists to prevent.
+     *
+     * Both transports at once. The LAN datagram lands in milliseconds when the
+     * two phones are on the same wifi; the RPC covers them being anywhere
+     * else, and is the only path that can check the partner's
+     * `allow_partner_dismiss` preference server-side. Whichever arrives first
+     * wins and the second is a harmless no-op.
+     *
+     * Your own alarm stops either way: dismissing for both while yours kept
+     * ringing would be a confusing halfway state.
+     */
+    fun dismissForBoth(ctx: Context, alarmId: String, pairId: String?) {
+        val base = alarmId.removePrefix(AlarmDef.SNOOZE_PREFIX)
+        splitFireId(base)?.let { (alarm, firedAt) ->
+            LanSync.requestDismissForBoth(ctx, RingSync.sessionIdFor(alarm, firedAt))
+            RingSync.actOnPartner(ctx, alarm, firedAt, pairId, "dismiss") { ok ->
+                Log.i(TAG, "dismiss-for-both RPC reported ok=$ok")
+            }
+        }
+        dismiss(ctx, alarmId, pairId)
+    }
+
     /** The fired-instant id, not a snooze-wrapped one -- a snooze is part of the
      *  same ring session, not a new one, so it must resolve to the same id.
      *
@@ -114,11 +142,13 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 pairId = pairId
             )
             ACTION_DISMISS -> AlarmActions.dismiss(context, id, pairId)
+            ACTION_DISMISS_BOTH -> AlarmActions.dismissForBoth(context, id, pairId)
         }
     }
 
     companion object {
         const val ACTION_SNOOZE = "com.duet.alarm.action.SNOOZE"
         const val ACTION_DISMISS = "com.duet.alarm.action.DISMISS"
+        const val ACTION_DISMISS_BOTH = "com.duet.alarm.action.DISMISS_BOTH"
     }
 }

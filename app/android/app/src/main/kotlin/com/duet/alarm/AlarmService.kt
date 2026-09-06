@@ -44,6 +44,24 @@ class AlarmService : Service() {
         // kills us for not posting a foreground notification.
         startForeground(NOTIF_ID, buildNotification(id, label, def))
 
+        // Launch the ringing screen OURSELVES rather than trusting the
+        // full-screen intent alone.
+        //
+        // setFullScreenIntent is supposed to be enough, and on stock Android it
+        // usually is. In practice several OEM skins -- HyperOS/MIUI among them,
+        // which is what this is tested on -- suppress it unless an extra
+        // background-pop-up permission has been granted, and the user gets a
+        // notification on the lock screen instead of the alarm screen. That is
+        // the failure this call exists to close.
+        //
+        // It is a legitimate background activity start, not a workaround: an
+        // app whose setAlarmClock alarm has just fired is explicitly exempt
+        // from the background-activity-launch restrictions. Wrapped anyway,
+        // because a refusal here must never take the ringing down with it --
+        // the notification's full-screen intent is still there as the fallback.
+        runCatching { startActivity(ringingIntent(id, label, def)) }
+            .onFailure { Log.w(TAG, "could not launch ringing screen directly", it) }
+
         acquireWakeLock()
         startAudio(def?.soundRef ?: "default")
         startVibration()
@@ -131,6 +149,27 @@ class AlarmService : Service() {
         Log.i(TAG, "re-armed $base for next occurrence at $next")
     }
 
+    /**
+     * The whole definition rides on the intent: the service deletes the stored
+     * alarm the moment it fires (a one-shot is spent), so the ringing screen
+     * cannot look it up afterwards.
+     *
+     * One function for both the direct launch and the full-screen intent --
+     * two copies of this would drift, and a ringing screen missing its pairId
+     * silently loses every partner feature on it.
+     */
+    private fun ringingIntent(id: String, label: String, def: AlarmDef?) =
+        Intent(this, RingingActivity::class.java).apply {
+            putExtra(AlarmReceiver.EXTRA_ALARM_ID, id)
+            putExtra("label", label)
+            putExtra("soundRef", def?.soundRef ?: "default")
+            putExtra("snoozeMinutes", def?.snoozeMinutes ?: 9)
+            putExtra("maxSnoozes", def?.maxSnoozes ?: 3)
+            putExtra("snoozeCount", def?.snoozeCount ?: 0)
+            putExtra("pairId", def?.pairId)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+
     private fun buildNotification(id: String, label: String, def: AlarmDef?): Notification {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -151,20 +190,7 @@ class AlarmService : Service() {
         }
 
         val fullScreen = PendingIntent.getActivity(
-            this, 1,
-            Intent(this, RingingActivity::class.java).apply {
-                // The whole definition rides on the intent: the service deletes
-                // the stored alarm once it fires (a one-shot is spent), so the
-                // ringing screen cannot look it up afterwards.
-                putExtra(AlarmReceiver.EXTRA_ALARM_ID, id)
-                putExtra("label", label)
-                putExtra("soundRef", def?.soundRef ?: "default")
-                putExtra("snoozeMinutes", def?.snoozeMinutes ?: 9)
-                putExtra("maxSnoozes", def?.maxSnoozes ?: 3)
-                putExtra("snoozeCount", def?.snoozeCount ?: 0)
-                putExtra("pairId", def?.pairId)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            },
+            this, 1, ringingIntent(id, label, def),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -217,6 +243,19 @@ class AlarmService : Service() {
                 null, "Dismiss", action(AlarmActionReceiver.ACTION_DISMISS, 11)
             ).build()
         )
+        // "Dismiss for both" is a plain third action here, not the deliberate
+        // hold gesture the ringing screen uses (ADR-006). A notification action
+        // cannot be held, and a tray button is already harder to hit by
+        // accident than a full-screen one under a thumb at 06:00. Only shown
+        // when there is actually a partner to dismiss for.
+        if (def?.pairId != null) {
+            builder.addAction(
+                Notification.Action.Builder(
+                    null, "Dismiss for both",
+                    action(AlarmActionReceiver.ACTION_DISMISS_BOTH, 12)
+                ).build()
+            )
+        }
 
         return builder.build()
     }

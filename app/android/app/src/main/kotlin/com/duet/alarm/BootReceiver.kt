@@ -26,6 +26,13 @@ class BootReceiver : BroadcastReceiver() {
                 AlarmScheduler.rezone(context)
             }
 
+            // Re-arming only restores what this phone already knew about. If
+            // the partner added an alarm while it was off, only a pull finds
+            // it -- and the heartbeat that would have done so died with the
+            // reboot, so it has to be started again here.
+            SyncReceiver.schedule(context)
+            AlarmPull.pull(context)
+
             BootLog.record(context, intent.action ?: "unknown")
         } catch (t: Throwable) {
             Log.e(TAG, "re-arm FAILED after ${intent.action}", t)
