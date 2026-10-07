@@ -23,6 +23,8 @@ class Alarm {
     this.ringTarget = RingTarget.both,
     this.pairId,
     this.partnerEnabled = true,
+    this.wakeLaterId,
+    this.ownerId,
     this.deletedAt,
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? DateTime.now();
@@ -59,6 +61,69 @@ class Alarm {
   /// solely by [enabled]. Defaults true so a solo user, or an alarm with no
   /// partner row yet, looks no different than before.
   final bool partnerEnabled;
+
+  /// The listener whose phone rings [wakeLaterMinutes] after this alarm's
+  /// time, or null when both ring together (migration 0011). A user id rather
+  /// than "the partner", because which of you is "the partner" depends on
+  /// whose phone is reading it.
+  final String? wakeLaterId;
+
+  static const wakeLaterMinutes = 15;
+
+  /// Who created the alarm, from `alarms.owner_id`; null until it has been
+  /// synced, which can only mean it was made on this phone. [ringTarget] is
+  /// stored relative to this person, so "owner" means them, not whoever is
+  /// looking.
+  final String? ownerId;
+
+  bool isOwnedBy(String? userId) => ownerId == null || ownerId == userId;
+
+  /// [ringTarget] as [userId] sees it: "owner" always means "me" on the
+  /// phone reading it, so a partner-created "Just me" reads as "Just them".
+  RingTarget targetFor(String? userId) => isOwnedBy(userId)
+      ? ringTarget
+      : switch (ringTarget) {
+          RingTarget.owner => RingTarget.partner,
+          RingTarget.partner => RingTarget.owner,
+          RingTarget.both => RingTarget.both,
+        };
+
+  /// Whether [userId]'s phone should ring for this alarm at all.
+  bool ringsFor(String? userId) => targetFor(userId) != RingTarget.partner;
+
+  /// This alarm as [userId]'s phone should arm it: unchanged, unless they are
+  /// the one being woken later, in which case the wall time moves on by
+  /// [wakeLaterMinutes] -- carrying the repeat days and one-shot date across
+  /// midnight with it, so 23:50 on Mondays becomes 00:05 on Tuesdays.
+  Alarm forListener(String? userId) {
+    if (userId == null || wakeLaterId != userId) return this;
+    final total = hour * 60 + minute + wakeLaterMinutes;
+    final nextDay = total >= 24 * 60;
+    final t = total % (24 * 60);
+    var days = repeatDays;
+    if (nextDay && days != Repeat.none) {
+      days = ((days << 1) | (days >> 6)) & 0x7f;
+    }
+    return Alarm(
+      id: id,
+      hour: t ~/ 60,
+      minute: t % 60,
+      label: label,
+      enabled: enabled,
+      repeatDays: days,
+      oneShotDate: nextDay ? oneShotDate?.add(const Duration(days: 1)) : oneShotDate,
+      soundRef: soundRef,
+      snoozeMinutes: snoozeMinutes,
+      maxSnoozes: maxSnoozes,
+      ringTarget: ringTarget,
+      pairId: pairId,
+      partnerEnabled: partnerEnabled,
+      wakeLaterId: wakeLaterId,
+      ownerId: ownerId,
+      deletedAt: deletedAt,
+      updatedAt: updatedAt,
+    );
+  }
 
   /// Soft delete. A tombstone has to reach the other device to disarm it there;
   /// a hard delete that never syncs is an alarm that rings forever (docs/03).
@@ -118,6 +183,8 @@ class Alarm {
     RingTarget? ringTarget,
     String? pairId,
     bool? partnerEnabled,
+    String? wakeLaterId,
+    bool clearWakeLater = false,
     DateTime? deletedAt,
   }) =>
       Alarm(
@@ -135,6 +202,9 @@ class Alarm {
         ringTarget: ringTarget ?? this.ringTarget,
         pairId: pairId ?? this.pairId,
         partnerEnabled: partnerEnabled ?? this.partnerEnabled,
+        wakeLaterId:
+            clearWakeLater ? null : (wakeLaterId ?? this.wakeLaterId),
+        ownerId: ownerId,
         deletedAt: deletedAt ?? this.deletedAt,
         updatedAt: DateTime.now(),
       );
@@ -152,6 +222,8 @@ class Alarm {
         'max_snoozes': maxSnoozes,
         'ring_target': ringTarget.name,
         'pair_id': pairId,
+        'wake_later_id': wakeLaterId,
+        'owner_id': ownerId,
         'deleted_at': deletedAt?.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -174,6 +246,8 @@ class Alarm {
           orElse: () => RingTarget.both,
         ),
         pairId: m['pair_id'] as String?,
+        wakeLaterId: m['wake_later_id'] as String?,
+        ownerId: m['owner_id'] as String?,
         deletedAt: m['deleted_at'] == null
             ? null
             : DateTime.parse(m['deleted_at'] as String),
@@ -207,6 +281,7 @@ class Alarm {
         'ring_target': ringTarget.name,
         'snooze_minutes': snoozeMinutes,
         'max_snoozes': maxSnoozes,
+        'wake_later_id': wakeLaterId,
         'deleted_at': deletedAt?.toIso8601String(),
         // updated_at is set by a database trigger, never by us: sync resolves
         // conflicts on it, and a client that could set it could win every one.
@@ -240,6 +315,8 @@ class Alarm {
         orElse: () => RingTarget.both,
       ),
       pairId: r['pair_id'] as String?,
+      wakeLaterId: r['wake_later_id'] as String?,
+      ownerId: r['owner_id'] as String?,
       deletedAt: r['deleted_at'] == null
           ? null
           : DateTime.parse(r['deleted_at'] as String),
@@ -255,4 +332,8 @@ enum RingTarget {
 
   const RingTarget(this.label);
   final String label;
+
+  /// [label], with "them" swapped for the partner's own pronoun.
+  String labelFor(String them) =>
+      this == RingTarget.partner ? 'Just $them' : label;
 }

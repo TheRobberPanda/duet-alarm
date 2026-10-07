@@ -52,6 +52,7 @@ object AlarmPull {
 
     /** Matches AlarmRepository.window. */
     private const val WINDOW_MS = 48L * 60L * 60L * 1000L
+    private const val WAKE_LATER_MINUTES = 15
 
     /**
      * Fetches and arms, on a background thread. Silent about everything: called
@@ -150,6 +151,14 @@ object AlarmPull {
             val enabled = mine?.second ?: o.optBoolean("enabled", true)
             if (!enabled) continue
 
+            // "Just me" / "Just them" -- ring_target is relative to owner_id,
+            // so the phone it leaves out arms nothing (Alarm.ringsFor in Dart).
+            val ownedByMe = o.optString("owner_id", "") == uid
+            when (o.optString("ring_target", "both")) {
+                "owner" -> if (!ownedByMe) continue
+                "partner" -> if (ownedByMe) continue
+            }
+
             // 'absolute' alarms are a fixed moment and are not wall-clock
             // recomputable; leave those to Dart rather than guess.
             if (o.optString("tz_mode", "local") != "local") continue
@@ -157,11 +166,29 @@ object AlarmPull {
             val time = o.optString("local_time", "") // "13:36:00"
             val parts = time.split(":")
             if (parts.size < 2) continue
-            val hour = parts[0].toIntOrNull() ?: continue
-            val minute = parts[1].toIntOrNull() ?: continue
+            var hour = parts[0].toIntOrNull() ?: continue
+            var minute = parts[1].toIntOrNull() ?: continue
 
-            val repeatDays = o.optInt("repeat_days", 0)
-            val oneShot = if (o.isNull("one_shot_date")) null else o.optString("one_shot_date", null)
+            var repeatDays = o.optInt("repeat_days", 0)
+            var oneShot = if (o.isNull("one_shot_date")) null else o.optString("one_shot_date", null)
+
+            // "Wake them 15 minutes later" (migration 0011): if this phone is
+            // the later one, shift the wall time -- and the days, when that
+            // crosses midnight -- exactly as Alarm.forListener does in Dart.
+            if (!o.isNull("wake_later_id") && o.optString("wake_later_id") == uid) {
+                val total = hour * 60 + minute + WAKE_LATER_MINUTES
+                val nextDay = total >= 24 * 60
+                hour = (total % (24 * 60)) / 60
+                minute = (total % (24 * 60)) % 60
+                if (nextDay) {
+                    if (repeatDays != 0) repeatDays = ((repeatDays shl 1) or (repeatDays shr 6)) and 0x7f
+                    oneShot = oneShot?.let {
+                        try {
+                            java.time.LocalDate.parse(it).plusDays(1).toString()
+                        } catch (t: Throwable) { it }
+                    }
+                }
+            }
 
             val def = AlarmDef(
                 id = id,

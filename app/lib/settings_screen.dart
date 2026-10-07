@@ -72,6 +72,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _load();
   }
 
+  Future<void> _setPronouns(String pronouns) async {
+    final p = _profile;
+    if (p == null || p.pronouns == pronouns) return;
+    setState(() => _profile = Profile(
+          id: p.id,
+          displayName: p.displayName,
+          timezone: p.timezone,
+          allowPartnerDismiss: p.allowPartnerDismiss,
+          accent: p.accent,
+          pronouns: pronouns,
+        ));
+    try {
+      await _repo.updatePronouns(pronouns);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not save pronouns: $e');
+    }
+    await _load();
+  }
+
+  Widget _pronounPicker() {
+    const options = [('she', 'She / her'), ('he', 'He / him'), ('they', 'They / them')];
+    final current = _profile?.pronouns ?? 'they';
+    return Row(
+      children: [
+        for (final (value, text) in options) ...[
+          if (value != 'she') const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _setPronouns(value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  color: current == value
+                      ? SkinColors.instance.accent.withValues(alpha: 0.18)
+                      : Colors.transparent,
+                  border: Border.all(
+                    color: current == value
+                        ? SkinColors.instance.accent
+                        : DuetColors.faint.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Text(text,
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        color: current == value
+                            ? DuetColors.text
+                            : DuetColors.dim)),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Future<void> _setAllowPartnerDismiss(bool allow) async {
     // Optimistic, then reconciled from the server -- the toggle is the whole
     // point of this screen and must never look like it did nothing.
@@ -83,6 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             timezone: _profile!.timezone,
             allowPartnerDismiss: allow,
             accent: _profile!.accent,
+            pronouns: _profile!.pronouns,
           ));
     await _repo.setAllowPartnerDismiss(allow);
     await _load();
@@ -110,6 +169,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             timezone: _profile!.timezone,
             allowPartnerDismiss: _profile!.allowPartnerDismiss,
             accent: skinId,
+            pronouns: _profile!.pronouns,
           ));
 
     // Everything below is bookkeeping, not feedback. A theme switch repaints
@@ -139,8 +199,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ok = await _confirm(
       title: 'Leave this pair?',
       body: 'Your alarms stay on this phone, but they stop being shared. '
-          '${_pair?.partner?.shortName ?? 'Your partner'} keeps theirs too -- '
-          'nothing on their phone changes.',
+          '${_pair?.partner?.shortName ?? 'Your partner'} keeps '
+          '${_pair?.partner?.theirs ?? 'theirs'} too -- '
+          'nothing on ${_pair?.partner?.their ?? 'their'} phone changes.',
       confirmLabel: 'Leave pair',
     );
     if (ok != true) return;
@@ -281,6 +342,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: const TextStyle(fontSize: 12.5, color: DuetColors.faint)),
 
               const SizedBox(height: 28),
+              const SectionLabel('Your pronouns'),
+              const SizedBox(height: 10),
+              _pronounPicker(),
+              const SizedBox(height: 6),
+              Text(
+                paired
+                    ? '${_pair!.partner!.shortName}\'s app uses these -- '
+                        '"wake her up", "just him".'
+                    : 'Your partner\'s app uses these -- "wake her up", "just him".',
+                style: const TextStyle(fontSize: 12.5, color: DuetColors.faint),
+              ),
+
+              const SizedBox(height: 28),
               const SectionLabel('Partner'),
               const SizedBox(height: 10),
               DuetCard(
@@ -312,13 +386,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Let them dismiss for me',
+                          Text('Let ${_pair!.partner!.them} dismiss for me',
                               style: TextStyle(fontSize: 14.5, color: DuetColors.text)),
                           const SizedBox(height: 4),
                           Text(
                             allowPartnerDismiss
                                 ? '${_pair!.partner!.shortName} can snooze or dismiss '
-                                    'your alarm from their phone.'
+                                    'your alarm from ${_pair!.partner!.their} phone.'
                                 : 'Only you can stop your alarm, even when '
                                     '${_pair!.partner!.shortName} is already up.',
                             style: const TextStyle(

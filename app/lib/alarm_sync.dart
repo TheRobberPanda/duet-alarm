@@ -21,6 +21,10 @@ class AlarmSync {
 
   String? get _userId => _db.auth.currentUser?.id;
 
+  /// Who this phone belongs to, so the repository can tell whether an alarm's
+  /// "wake later" applies here.
+  String? get userId => _userId;
+
   /// Reconciles [local] against the server and returns the merged set.
   ///
   /// Throws nothing: a failed sync returns [local] unchanged, because an alarm
@@ -58,8 +62,13 @@ class AlarmSync {
 
       // Everything either side knows about.
       for (final id in {...localById.keys, ...remote.keys}) {
-        final l = localById[id];
+        var l = localById[id];
         final r = remote[id];
+        // Cached before owners were tracked: take it from the server, or a
+        // push would claim the partner's alarm as ours.
+        if (l != null && r != null && l.ownerId == null && r.ownerId != null) {
+          l = Alarm.fromJson({...l.toJson(), 'owner_id': r.ownerId});
+        }
 
         if (r == null) {
           // Never reached the server.
@@ -165,7 +174,18 @@ class AlarmSync {
   }
 
   Future<void> _push(Alarm alarm, String uid) async {
-    await _db.from('alarms').upsert(alarm.toDbRow(uid));
+    // Your partner's alarm keeps its owner when you edit it: ring_target is
+    // relative to owner_id, so rewriting the owner would flip "Just me" onto
+    // the wrong person. An upsert cannot do that (the insert policy demands
+    // owner_id = you, even when the row already exists), so update in place.
+    if (!alarm.isOwnedBy(uid)) {
+      await _db
+          .from('alarms')
+          .update(alarm.toDbRow(alarm.ownerId!)..remove('owner_id'))
+          .eq('id', alarm.id);
+    } else {
+      await _db.from('alarms').upsert(alarm.toDbRow(uid));
+    }
 
     // The sound is per-listener, not per-alarm: this row is what *I* hear.
     // Choosing what the partner hears writes a second row with their id, which

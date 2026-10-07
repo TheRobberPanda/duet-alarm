@@ -97,6 +97,15 @@ class AlarmEngine {
         'allowPartnerDismiss': allowPartnerDismiss,
       });
 
+  /// The refresh token held natively, which may be FRESHER than
+  /// supabase_flutter's own copy: the overnight puller (AlarmPull.kt) refreshes
+  /// the Supabase token on its own, and Supabase rotates refresh tokens --
+  /// storing the new one only in native AuthStore. Flutter asks for it on cold
+  /// start to re-mint its session after its stored refresh token has been
+  /// spent, so a confirmed user is not sent back to the sign-in screen.
+  static Future<String?> storedRefreshToken() =>
+      _channel.invokeMethod<String>('getStoredRefreshToken');
+
   static Future<void> disarm(String id) =>
       _channel.invokeMethod('disarm', {'id': id});
 

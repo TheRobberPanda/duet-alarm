@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'alarm_engine.dart';
+import 'pair_repository.dart';
 import 'theme.dart';
 
 /// Turns whatever Spotify put on the clipboard into a `spotify:` sound ref.
@@ -187,7 +188,7 @@ class _SoundPickerScreenState extends State<SoundPickerScreen> {
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500)),
                           const SizedBox(height: 2),
-                          Text('Wake them up as you',
+                          Text('Wake ${PairRepository.lastKnownPartner?.them ?? 'them'} up as you',
                               style: TextStyle(
                                   fontSize: 12.5,
                                   color: SkinColors.instance.accent.withValues(alpha: 0.8))),

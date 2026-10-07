@@ -223,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       stats.add(mine == theirs
           ? 'Dead even with $partner: $mine dismissals each.'
           : mine > theirs
-              ? 'You lead $partner: $mine dismissals to their $theirs.'
+              ? 'You lead $partner: $mine dismissals to '
+                  '${PairRepository.lastKnownPartner?.their ?? 'their'} $theirs.'
               : '$partner leads: $theirs dismissals to your $mine.');
     }
     // A whisper of help in between the numbers, so the line teaches as well
@@ -611,14 +612,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     size: 268,
                     strokeWidth: 5,
                     fill: true,
-                    mineOn: alarm.enabled,
+                    mineOn: alarm.enabled &&
+                        alarm.ringsFor(AlarmRepository.instance.sync?.userId),
                     hasPartner: alarm.partnerEnabled &&
-                        alarm.ringTarget != RingTarget.owner,
+                        alarm.targetFor(AlarmRepository.instance.sync?.userId) != RingTarget.owner,
                     // Paired but sitting this one out -> their arc draws
                     // dashed, the canvas's "not yet" state. Owner-only rings
                     // genuinely exclude them, so no arc at all.
                     partnerExists: _partnerName != null &&
-                        alarm.ringTarget != RingTarget.owner,
+                        alarm.targetFor(AlarmRepository.instance.sync?.userId) != RingTarget.owner,
                   ),
                   Column(
                     mainAxisSize: MainAxisSize.min,
@@ -740,11 +742,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   size: 26,
                   strokeWidth: 2.5,
                   animate: false,
-                  mineOn: on,
+                  mineOn: on && alarm.ringsFor(AlarmRepository.instance.sync?.userId),
                   hasPartner: alarm.partnerEnabled &&
-                      alarm.ringTarget != RingTarget.owner,
+                      alarm.targetFor(AlarmRepository.instance.sync?.userId) != RingTarget.owner,
                   partnerExists: _partnerName != null &&
-                      alarm.ringTarget != RingTarget.owner,
+                      alarm.targetFor(AlarmRepository.instance.sync?.userId) != RingTarget.owner,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

@@ -112,6 +112,14 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
 
+                    // The refresh token the native overnight puller may have
+                    // rotated ahead of supabase_flutter's own copy. Flutter
+                    // asks for it on cold start to re-mint its session when
+                    // its stored refresh token has been spent -- otherwise a
+                    // confirmed user is sent back to sign-in every morning.
+                    "getStoredRefreshToken" ->
+                        result.success(AuthStore.refreshToken(this))
+
                     // So the ringing screen -- plain Android views, no Flutter
                     // engine -- can wear the same skins as the rest of the app.
                     "setSkinColors" -> {

@@ -8,6 +8,7 @@ import 'alarm_engine.dart';
 import 'alarm_repository.dart';
 import 'clock_picker.dart';
 import 'next_fire.dart';
+import 'pair_repository.dart';
 import 'sound_picker_screen.dart';
 import 'theme.dart';
 
@@ -32,6 +33,17 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
   late int _snoozeMinutes;
   late int _maxSnoozes;
   late RingTarget _target;
+
+  /// Who is woken [Alarm.wakeLaterMinutes] late, or null. Normally the
+  /// partner; it is you when they set it that way from their phone, and the
+  /// toggle then keeps it on you rather than silently swapping who waits.
+  String? _wakeLaterId;
+
+  final Profile? _partner = PairRepository.lastKnownPartner;
+  String? get _myId => _repo.sync?.userId;
+
+  /// Her / him / them -- "them" until we know.
+  String get _them => _partner?.them ?? 'them';
 
   String _soundTitle = 'Default alarm';
 
@@ -58,7 +70,9 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
     _soundRef = a?.soundRef ?? 'default';
     _snoozeMinutes = a?.snoozeMinutes ?? 9;
     _maxSnoozes = a?.maxSnoozes ?? 3;
-    _target = a?.ringTarget ?? RingTarget.both;
+    // Shown from this phone's side: right half is always you.
+    _target = a?.targetFor(_myId) ?? RingTarget.both;
+    _wakeLaterId = a?.wakeLaterId;
     _label = TextEditingController(text: a?.label ?? '');
     _resolveSoundTitle();
     if (_isNew) _maybeShowTimeHint();
@@ -162,7 +176,17 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
       soundRef: _soundRef,
       snoozeMinutes: _snoozeMinutes,
       maxSnoozes: _maxSnoozes,
-      ringTarget: _target,
+      // Stored relative to the owner, who stays whoever created it.
+      ownerId: widget.alarm?.ownerId,
+      ringTarget: widget.alarm == null || widget.alarm!.isOwnedBy(_myId)
+          ? _target
+          : switch (_target) {
+              RingTarget.owner => RingTarget.partner,
+              RingTarget.partner => RingTarget.owner,
+              RingTarget.both => RingTarget.both,
+            },
+      // Staggering only means anything when you both ring.
+      wakeLaterId: _target == RingTarget.both ? _wakeLaterId : null,
     );
 
     await _repo.save(alarm);
@@ -217,9 +241,14 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
           Center(
             child: WhoRingsPicker(
               target: _target,
+              them: _them,
               onChanged: (t) => setState(() => _target = t),
             ),
           ),
+          if (_partner != null && _target == RingTarget.both) ...[
+            const SizedBox(height: 14),
+            _wakeLaterCard(),
+          ],
           const SizedBox(height: 22),
 
           Column(
@@ -310,7 +339,10 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _soundCard(title: 'They will hear', value: 'Once you pair'),
+                child: _soundCard(
+                  title: '${_capitalize(_partner?.they ?? 'they')} will hear',
+                  value: 'Once you pair',
+                ),
               ),
             ],
           ),
@@ -532,6 +564,52 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
         ),
       );
 
+  static String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  Widget _wakeLaterCard() {
+    // Remembered from the saved alarm, so switching off and on again does not
+    // quietly hand the wait to the other person.
+    final savedLaterIsMe =
+        widget.alarm?.wakeLaterId != null && widget.alarm?.wakeLaterId == _myId;
+    final laterIsMe =
+        _wakeLaterId == null ? savedLaterIsMe : _wakeLaterId == _myId;
+    final on = _wakeLaterId != null;
+    final who = laterIsMe ? 'me' : _them;
+    final m = Alarm.wakeLaterMinutes;
+    final later = (_hour * 60 + _minute + m) % (24 * 60);
+    final laterLabel =
+        '${(later ~/ 60).toString().padLeft(2, '0')}:${(later % 60).toString().padLeft(2, '0')}';
+    return DuetCard(
+      child: Row(children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Wake $who up $m minutes later',
+                  style: const TextStyle(fontSize: 15, color: DuetColors.text)),
+              const SizedBox(height: 4),
+              Text(
+                on
+                    ? (laterIsMe
+                        ? 'You ring at $laterLabel, ${_partner!.shortName} first.'
+                        : '${_partner!.shortName} rings at $laterLabel, you first.')
+                    : 'You both ring at the same time.',
+                style: const TextStyle(
+                    fontSize: 12.5, color: DuetColors.dim, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        DuetSwitch(
+          value: on,
+          onChanged: (v) => setState(() => _wakeLaterId =
+              v ? (laterIsMe ? _myId : _partner!.id) : null),
+        ),
+      ]),
+    );
+  }
+
   Widget _snoozeRow() => DuetCard(
         child: Column(children: [
           Row(children: [
@@ -601,9 +679,17 @@ class _AlarmEditorScreenState extends State<AlarmEditorScreen> {
 /// fill sweeps in animated, the way the home dial wears it, and the
 /// excluded side goes quiet.
 class WhoRingsPicker extends StatelessWidget {
-  const WhoRingsPicker({super.key, required this.target, required this.onChanged});
+  const WhoRingsPicker({
+    super.key,
+    required this.target,
+    required this.onChanged,
+    this.them = 'them',
+  });
 
   final RingTarget target;
+
+  /// The partner's object pronoun, for the "Just her" label.
+  final String them;
   final ValueChanged<RingTarget> onChanged;
 
   static const _size = 190.0;
@@ -687,8 +773,8 @@ class WhoRingsPicker extends StatelessWidget {
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
               child: Text(
-                target.label,
-                key: ValueKey(target.label),
+                target.labelFor(them),
+                key: ValueKey(target.labelFor(them)),
                 style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,

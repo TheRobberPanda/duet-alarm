@@ -57,105 +57,118 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Scrolls with a min height of the viewport: the Spacers still centre
+      // things on a tall screen, and when the keyboard takes half of it the
+      // form scrolls instead of overflowing.
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 26),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              const Center(
-                child: HaloGlow(size: 300, child: PairRing(size: 104)),
-              ),
-              const SizedBox(height: 28),
-              const Row(
-                children: [
-                  Expanded(
-                    child: Text('An alarm you share.',
-                        style: TextStyle(
-                            fontSize: 30,
-                            height: 1.1,
-                            fontWeight: FontWeight.w400,
-                            letterSpacing: -0.3,
-                            color: DuetColors.text)),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 26),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Spacer(),
+                      const Center(
+                        child: HaloGlow(size: 300, child: PairRing(size: 104)),
+                      ),
+                      const SizedBox(height: 28),
+                      const Row(
+                        children: [
+                          Expanded(
+                            child: Text('An alarm you share.',
+                                style: TextStyle(
+                                    fontSize: 30,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w400,
+                                    letterSpacing: -0.3,
+                                    color: DuetColors.text)),
+                          ),
+                          HeartAccent(size: 22),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Both phones ring. Either of you can turn it off.',
+                        style: TextStyle(fontSize: 15.5, color: DuetColors.muted, height: 1.45),
+                      ),
+                      const SizedBox(height: 34),
+
+                      if (!_codeSent) ...[
+                        TextField(
+                          controller: _email,
+                          keyboardType: TextInputType.emailAddress,
+                          autocorrect: false,
+                          style: const TextStyle(color: DuetColors.text, fontSize: 16),
+                          decoration: _fieldDecoration('you@example.com', 'Email'),
+                        ),
+                        const SizedBox(height: 12),
+                        DuetButton('Send me a code', filled: true, busy: _busy, onTap: _send),
+                      ] else ...[
+                        Text('Code sent to ${_email.text.trim()}',
+                            style: const TextStyle(color: DuetColors.muted, fontSize: 14.5)),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _code,
+                          keyboardType: TextInputType.number,
+                          autofocus: true,
+                          // NOT hard-coded to six. Supabase's email OTP length is a
+                          // server setting (6-10), and a client constant that has to
+                          // match it is a silent breakage waiting to happen -- exactly
+                          // what bit us: the code arrived longer than the field allowed
+                          // and could not be typed at all. Let the server decide what is
+                          // valid; the field just has to not get in the way. (Which is
+                          // also why the canvas's segmented code cells are not used
+                          // here: they assume a known length. pair_screen can afford
+                          // them -- the invite code IS six -- this field cannot.)
+                          maxLength: 12,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          onSubmitted: (_) => _verify(),
+                          style: TextStyle(
+                              color: DuetColors.text,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w300,
+                              letterSpacing: 8,
+                              fontFeatures: const [FontFeature.tabularFigures()]),
+                          textAlign: TextAlign.center,
+                          decoration: _fieldDecoration('', 'Code from your email')
+                              .copyWith(counterText: ''),
+                        ),
+                        const SizedBox(height: 12),
+                        DuetButton('Sign in', filled: true, busy: _busy, onTap: _verify),
+                        const SizedBox(height: 10),
+                        TextButton(
+                          onPressed: _busy ? null : () => setState(() => _codeSent = false),
+                          child: const Text('Use a different email',
+                              style: TextStyle(color: DuetColors.dim)),
+                        ),
+                      ],
+
+                      if (_error != null) ...[
+                        const SizedBox(height: 14),
+                        DuetCard(
+                          border: DuetColors.danger,
+                          child: Text(_error!,
+                              style: const TextStyle(color: DuetColors.danger, fontSize: 13.5)),
+                        ),
+                      ],
+
+                      const Spacer(),
+                      const Text(
+                        'We only use your email to sign you in.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5, color: DuetColors.faint),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  HeartAccent(size: 22),
-                ],
+                ),
               ),
-              const SizedBox(height: 10),
-              const Text(
-                'Both phones ring. Either of you can turn it off.',
-                style: TextStyle(fontSize: 15.5, color: DuetColors.muted, height: 1.45),
-              ),
-              const SizedBox(height: 34),
-
-              if (!_codeSent) ...[
-                TextField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
-                  style: const TextStyle(color: DuetColors.text, fontSize: 16),
-                  decoration: _fieldDecoration('you@example.com', 'Email'),
-                ),
-                const SizedBox(height: 12),
-                DuetButton('Send me a code', filled: true, busy: _busy, onTap: _send),
-              ] else ...[
-                Text('Code sent to ${_email.text.trim()}',
-                    style: const TextStyle(color: DuetColors.muted, fontSize: 14.5)),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _code,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  // NOT hard-coded to six. Supabase's email OTP length is a
-                  // server setting (6-10), and a client constant that has to
-                  // match it is a silent breakage waiting to happen -- exactly
-                  // what bit us: the code arrived longer than the field allowed
-                  // and could not be typed at all. Let the server decide what is
-                  // valid; the field just has to not get in the way. (Which is
-                  // also why the canvas's segmented code cells are not used
-                  // here: they assume a known length. pair_screen can afford
-                  // them -- the invite code IS six -- this field cannot.)
-                  maxLength: 12,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onSubmitted: (_) => _verify(),
-                  style: TextStyle(
-                      color: DuetColors.text,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: 8,
-                      fontFeatures: const [FontFeature.tabularFigures()]),
-                  textAlign: TextAlign.center,
-                  decoration: _fieldDecoration('', 'Code from your email')
-                      .copyWith(counterText: ''),
-                ),
-                const SizedBox(height: 12),
-                DuetButton('Sign in', filled: true, busy: _busy, onTap: _verify),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: _busy ? null : () => setState(() => _codeSent = false),
-                  child: const Text('Use a different email',
-                      style: TextStyle(color: DuetColors.dim)),
-                ),
-              ],
-
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                DuetCard(
-                  border: DuetColors.danger,
-                  child: Text(_error!,
-                      style: const TextStyle(color: DuetColors.danger, fontSize: 13.5)),
-                ),
-              ],
-
-              const Spacer(),
-              const Text(
-                'We only use your email to sign you in.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, color: DuetColors.faint),
-              ),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
         ),
       ),

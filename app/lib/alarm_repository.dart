@@ -84,6 +84,8 @@ class AlarmRepository {
           snoozeMinutes: old.snoozeMinutes,
           maxSnoozes: old.maxSnoozes,
           ringTarget: old.ringTarget,
+          wakeLaterId: old.wakeLaterId,
+          ownerId: old.ownerId,
         );
         migrated = true;
       }
@@ -179,8 +181,8 @@ class AlarmRepository {
     final now = DateTime.now();
     ({Alarm alarm, DateTime at})? best;
     for (final a in _alarms) {
-      if (!a.enabled) continue;
-      final at = a.nextFireAfter(now);
+      if (!a.enabled || !a.ringsFor(sync?.userId)) continue;
+      final at = a.forListener(sync?.userId).nextFireAfter(now);
       if (at == null) continue;
       if (best == null || at.isBefore(best.at)) best = (alarm: a, at: at);
     }
@@ -202,8 +204,13 @@ class AlarmRepository {
     final now = DateTime.now();
     final desired = <String, ({DateTime at, Alarm alarm})>{};
 
-    for (final alarm in _alarms) {
-      if (!alarm.enabled) continue;
+    final me = sync?.userId;
+    for (final defined in _alarms) {
+      if (!defined.enabled) continue;
+      // "Just me" / "Just them": the phone left out holds nothing at all.
+      if (!defined.ringsFor(me)) continue;
+      // Shifted if this phone is the one woken later; same id either way.
+      final alarm = defined.forListener(me);
       final times = fireTimesWithin(
         now: now,
         hour: alarm.hour,

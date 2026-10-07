@@ -11,6 +11,11 @@ class PairRepository {
 
   final SupabaseClient _db;
 
+  /// The partner from the most recent [currentPair], for screens that are
+  /// opened without one in hand (the alarm editor) and only need a name, an
+  /// id and a pronoun. Null while solo or before the first read.
+  static Profile? lastKnownPartner;
+
   static SupabaseClient get _client => Supabase.instance.client;
   factory PairRepository.instance() => PairRepository(_client);
 
@@ -55,6 +60,14 @@ class PairRepository {
     final id = currentUser?.id;
     if (id == null) return;
     await _db.from('profiles').update({'display_name': name.trim()}).eq('id', id);
+  }
+
+  /// 'she', 'he' or 'they' (migration 0011). Your partner's app uses it to
+  /// say "wake her up" rather than "wake them up".
+  Future<void> updatePronouns(String pronouns) async {
+    final id = currentUser?.id;
+    if (id == null) return;
+    await _db.from('profiles').update({'pronouns': pronouns}).eq('id', id);
   }
 
   Future<void> setAllowPartnerDismiss(bool allow) async {
@@ -242,6 +255,7 @@ class PairRepository {
       if (row['id'] != me) partner = Profile.fromMap(row);
     }
 
+    lastKnownPartner = partner;
     return PairState(
       pairId: pairId,
       plan: pair['plan'] as String? ?? 'free',
@@ -266,6 +280,7 @@ class Profile {
     required this.timezone,
     required this.allowPartnerDismiss,
     required this.accent,
+    this.pronouns = 'they',
   });
 
   final String id;
@@ -273,6 +288,18 @@ class Profile {
   final String timezone;
   final bool allowPartnerDismiss;
   final String accent;
+
+  /// 'she', 'he' or 'they'.
+  final String pronouns;
+
+  /// "Wake her up", "set it for him", "let them".
+  String get them => switch (pronouns) { 'she' => 'her', 'he' => 'him', _ => 'them' };
+  /// "She will hear".
+  String get they => switch (pronouns) { 'she' => 'she', 'he' => 'he', _ => 'they' };
+  /// "Her phone".
+  String get their => switch (pronouns) { 'she' => 'her', 'he' => 'his', _ => 'their' };
+  /// "Keeps hers too".
+  String get theirs => switch (pronouns) { 'she' => 'hers', 'he' => 'his', _ => 'theirs' };
 
   String get shortName => displayName.trim().isEmpty ? 'Partner' : displayName.trim();
   String get initial => shortName.substring(0, 1).toUpperCase();
@@ -283,6 +310,7 @@ class Profile {
         timezone: (m['timezone'] as String?) ?? 'UTC',
         allowPartnerDismiss: (m['allow_partner_dismiss'] as bool?) ?? true,
         accent: (m['accent'] as String?) ?? 'teal',
+        pronouns: (m['pronouns'] as String?) ?? 'they',
       );
 }
 

@@ -41,6 +41,34 @@ Future<void> main() async {
     // which is exactly the moment a stale native copy would otherwise go
     // uncorrected.
     final client = Supabase.instance.client;
+
+    // The native overnight puller (AlarmPull.kt) refreshes the Supabase token
+    // on its own, and Supabase ROTATES refresh tokens -- the new one is stored
+    // only in native AuthStore, leaving supabase_flutter holding a now-spent
+    // refresh token. On the next launch Flutter's auto-recovery tries the
+    // spent token, fails, and drops the session -- sending a confirmed user
+    // straight back to the sign-in screen. Recover here: if Flutter has no
+    // session, re-mint one from the native store's (fresher) refresh token
+    // before the UI ever builds, so AuthGate's first frame sees the truth.
+    if (client.auth.currentSession == null) {
+      final nativeRefresh = await AlarmEngine.storedRefreshToken();
+      if (nativeRefresh != null) {
+        try {
+          await client.auth.refreshSession(nativeRefresh);
+        } catch (_) {
+          // Token truly spent, or signed out elsewhere -- the sign-in gate
+          // is the correct state, so fall through.
+        }
+      }
+    }
+
+    // A firing alarm needs the token to report a ring session with no Flutter
+    // engine running (RingSync.kt), so it has to be pushed down natively
+    // rather than fetched on demand. Every auth change is a chance to refresh
+    // it -- including the token refresh Supabase does quietly on its own,
+    // which is exactly the moment a stale native copy would otherwise go
+    // uncorrected. This also covers the recovery just above, where the
+    // initial currentSession was null moments ago and is now restored.
     AlarmEngine.setAuthToken(
       client.auth.currentSession?.accessToken,
       client.auth.currentUser?.id,
